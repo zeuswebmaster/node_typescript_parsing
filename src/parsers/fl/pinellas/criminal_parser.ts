@@ -1,9 +1,11 @@
 import AbstractParser from '../../abstract_parser'
 import { IPublicRecordProducer } from '../../../models/public_record_producer'
+const fs = require('fs');
 import db from "../../../models/db";
 const nameParsingService = require("../../../categories/public_records/consumers/property_appraisers/consumer_dependencies/nameParsingServiceNew");
 
-export default class ProbateParser extends AbstractParser {
+
+export default class CriminalParser extends AbstractParser {
   protected count: number
   protected publicProducer: IPublicRecordProducer
   protected productId: any
@@ -22,13 +24,13 @@ export default class ProbateParser extends AbstractParser {
   }
 
   public getHeaders(fileName: string) : string[] {
-    if(fileName.match(/pinellas-odyssey-probate/i)) {
-        return this.getProbate();
+    if(fileName.match(/pinellas-odyssey-criminal/i)) {
+        return this.getCriminalAndTraffic();
     }
     return [];
   }
 
-  public getProbate() : string[] {
+  public getCriminalAndTraffic() : string[] {
     return [
         'caseNumber',
         'CaseType',
@@ -47,21 +49,48 @@ export default class ProbateParser extends AbstractParser {
   }
   
   public async parse(caseGroup: [{[ key: string]: any}] ): Promise<boolean> {
+    let skipHeader = true;
     for(const group of caseGroup) {
+        if(skipHeader){
+            skipHeader = false;
+            continue;
+        }
         const items = group[1];
-        let productName = '/fl/pinellas/probate';
+        let productName;
+        switch (items[0]?.["CaseType"]) {
+            case (items[0]?.["CaseType"].match(/felony/i) || {}).input:
+                this.type = 'Felony';
+                productName = '/fl/pinellas/criminal';
+                break;
+            case (items[0]?.["CaseType"].match(/misdemeanor/i) || {}).input:
+                this.type = 'Misdemeanor';
+                productName = '/fl/pinellas/criminal';
+                break;
+            case (items[0]?.["CaseType"].match(/traffic/i) || {}).input:
+            case (items[0]?.["CaseType"].match(/infraction/i) || {}).input:
+                this.type = items[0]?.["CaseType"];
+                productName = '/fl/pinellas/traffic';
+                break;
+            default:
+                console.log(items[0]?.["CaseType"]);
+                fs.appendFile('log.txt', items[0]?.["CaseType"] + '-' + items[0]?.["CaseNumber"] + '\n', function (err: any) {
+                  if (err) {
+                    // append failed
+                  } else {
+                    // done
+                  }
+                })
+                this.type = items[0]?.["CaseType"];
+                productName = '/fl/pinellas/criminal';
+                break;
+        }
 
         const productId = await db.models.Product.findOne({
             name: productName,
         }).exec();
 
-        let skipHeader = true;
         for(const party of items) {
-            if(skipHeader){
-              skipHeader = false;
-              continue;
-            }
-            const parsedName = nameParsingService.newParseName(party['Plaintiff/PetitionerName']);
+            const parsedName = nameParsingService.newParseName(party['Defendant/DecedentName']);
             const data = {
                 'Full Name': parsedName.fullName,
                 'First Name': parsedName.firstName,
@@ -73,14 +102,9 @@ export default class ProbateParser extends AbstractParser {
                 'Property State': party['Defendant/DecedentState'] || 'FL',
                 'Property Zip': party['Defendant/DecedentZip'],
                 'County': 'pinellas',
-                'Mailing Address': party['Plaintiff/PetitionerAddress'],
-                'Mailing Unit #': '',
-                'Mailing City': party['Plaintiff/PetitionerCity'],
-                'Mailing State': party['Plaintiff/PetitionerState'] || 'FL',
-                'Mailing Zip': party['Plaintiff/PetitionerZip'],
                 csvFillingDate: party['FillingDate'],
                 productId: productId,
-                originalDocType: party['CaseType'],
+                originalDocType: this.type,
               };
       
             if (await this.saveToOwnerProductPropertyByParser(data, this.publicProducer)) {

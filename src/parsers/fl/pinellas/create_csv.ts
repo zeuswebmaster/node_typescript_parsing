@@ -59,7 +59,7 @@ const dateInput: string = process.argv[2]; // YYYY-MM-DD
         ]);
         let caseDetailLinks = await page.$x('//a[contains(@href, "CaseDetail")]');
         for(let i = 0; i < caseDetailLinks.length; i++){
-            await sleep(3000);
+            // await sleep(3000);
             caseDetailLinks = await page.$x('//a[contains(@href, "CaseDetail")]');
             await caseDetailLinks[i].click();
             try{
@@ -100,17 +100,21 @@ const dateInput: string = process.argv[2]; // YYYY-MM-DD
             for(const nameHandle of nameHandlesDefendant){
                 let name = await nameHandle.evaluate((el: any) => el.textContent?.trim());
                 let nameId = await nameHandle.evaluate((el: any) => el.getAttribute('id').trim());
-                let addressRowHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ")]/text()[last()-1]');
+                let addressRowHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ") and contains(@rowspan, "2")=false]/text()[last()-1]');
                 let propertyZip = '';
                 let propertyAddress = '';
                 let propertyCity = '';
                 let propertyState = '';
                 try{
                     if (addressRowHandle.length > 0){
-                        let addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ")]/text()[last()-1]');
+                        let addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ") and contains(@rowspan, "2")=false]/text()[last()-1]');
                         propertyAddress = await addressHandle[0].evaluate((el: any) => el.textContent?.trim());
+                        if(propertyAddress.match(/^unit|apt|lot/i)){
+                            addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ") and contains(@rowspan, "2")=false]/text()[1]');
+                            propertyAddress = await addressHandle[0].evaluate((el: any) => el.textContent?.trim());
+                        }
                         try{
-                            let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ")]/text()[last()]');
+                            let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ") and contains(@rowspan, "2")=false]/text()[last()]');
                             let cityStateZip = await cityStateZipHandle[0].evaluate((el: any) => el.textContent?.trim());
                             let cityStateZipArr = cityStateZip.split(',');
                             propertyCity = cityStateZipArr[0].trim();
@@ -119,7 +123,7 @@ const dateInput: string = process.argv[2]; // YYYY-MM-DD
                             propertyZip = stateZipArr[1];
                             propertyState = stateZipArr[0];
                         } catch(e){
-                            let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ")]/text()[last()]');
+                            let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., " FL ") and contains(@rowspan, "2")=false]/text()[last()]');
                             let cityStateZip = await cityStateZipHandle[1].evaluate((el: any) => el.textContent?.trim());
                             let cityStateZipArr = cityStateZip.split(',');
                             propertyCity = cityStateZipArr[0].trim();
@@ -129,11 +133,15 @@ const dateInput: string = process.argv[2]; // YYYY-MM-DD
                             propertyState = stateZipArr[0];
                         }
                     } else {
-                        let addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ")]/text()[last()-1]');
+                        let addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[last()-1]');
+                        if(propertyAddress.match(/^unit|apt|lot/i)){
+                            addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[1]');
+                            propertyAddress = await addressHandle[0].evaluate((el: any) => el.textContent?.trim());
+                        }
                         if(addressHandle.length > 0){
                             propertyAddress = await addressHandle[0].evaluate((el: any) => el.textContent?.trim());
                             try{
-                                let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ")]/text()[last()]');
+                                let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[last()]');
                                 let cityStateZip = await cityStateZipHandle[0].evaluate((el: any) => el.textContent?.trim());
                                 let cityStateZipArr = cityStateZip.split(',');
                                 propertyCity = cityStateZipArr[0].trim();
@@ -142,7 +150,7 @@ const dateInput: string = process.argv[2]; // YYYY-MM-DD
                                 propertyZip = stateZipArr[1];
                                 propertyState = stateZipArr[0];
                             } catch(e){
-                                let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ")]/text()[last()]');
+                                let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[last()]');
                                 let cityStateZip = await cityStateZipHandle[1].evaluate((el: any) => el.textContent?.trim());
                                 let cityStateZipArr = cityStateZip.split(',');
                                 propertyCity = cityStateZipArr[0].trim();
@@ -166,16 +174,20 @@ const dateInput: string = process.argv[2]; // YYYY-MM-DD
             for(const nameHandle of nameHandlesPlaintiff){
                 let name = await nameHandle.evaluate((el: any) => el.textContent?.trim());
                 let nameId = await nameHandle.evaluate((el: any) => el.getAttribute('id').trim());
-                let addressRowHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ")]/text()[last()-1]');
+                let addressRowHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[last()-1]');
                 let propertyZip = '';
                 let propertyAddress = '';
                 let propertyCity = '';
                 let propertyState = '';
                 if (addressRowHandle.length > 0){
-                    let addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ")]/text()[last()-1]');
+                    let addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[last()-1]');
                     propertyAddress = await addressHandle[0].evaluate((el: any) => el.textContent?.trim());
+                    if(propertyAddress.match(/^unit|apt|lot/i)){
+                        addressHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[1]');
+                        propertyAddress = await addressHandle[0].evaluate((el: any) => el.textContent?.trim());
+                    }
                     try{
-                        let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ")]/text()[last()]');
+                        let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[last()]');
                         let cityStateZip = await cityStateZipHandle[0].evaluate((el: any) => el.textContent?.trim());
                         let cityStateZipArr = cityStateZip.split(',');
                         propertyCity = cityStateZipArr[0].trim();
@@ -184,7 +196,7 @@ const dateInput: string = process.argv[2]; // YYYY-MM-DD
                         propertyZip = stateZipArr[1];
                         propertyState = stateZipArr[0];
                     } catch(e){
-                        let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ")]/text()[last()]');
+                        let cityStateZipHandle = await page.$x('//td[contains(@headers, "'+nameId+'") and contains(., ", ") and contains(@rowspan, "2")=false]/text()[last()]');
                         let cityStateZip = await cityStateZipHandle[1].evaluate((el: any) => el.textContent?.trim());
                         let cityStateZipArr = cityStateZip.split(',');
                         propertyCity = cityStateZipArr[0].trim();
@@ -211,7 +223,8 @@ const dateInput: string = process.argv[2]; // YYYY-MM-DD
             }
             await Promise.all([
                 page.goBack(),
-                page.waitForNavigation()
+                // page.waitForNavigation()
+                page.waitForXPath('//a[contains(@href, "CaseDetail")]')
             ]);
         }
     }

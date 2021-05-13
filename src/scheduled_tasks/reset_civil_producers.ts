@@ -16,7 +16,7 @@ import db from '../models/db';
         }
     );
 
-    let counties = ['broward'];
+    let counties = ['broward', 'pinellas'];
     
     await db.models.PublicRecordProducer.updateMany(
         {

@@ -47,13 +47,13 @@ function getFormattedDate(date: Date) {
 
 // example key: 'fl/broward/2021-05-06/MOPROBAT.txt
 function getPracticeTypeFromKey(key: any): string {
-    if(key.match(/PROBAT/)){
+    if(key.match(/PROBAT/) || key.match(/odyssey-probate/)){
         return 'probate';
     } else if (key.match(/TENANT/) || key.match(/EVICT/)){
         return 'eviction';
-    } else if (key.match(/WKCIVILGAR/) || key.match(/CIVL/)){
+    } else if (key.match(/WKCIVILGAR/) || key.match(/CIVL/) || key.match(/odyssey-civil/)){
         return 'civil';
-    } else if (key.match(/FELONY/) || key.match(/MISDEM/)){
+    } else if (key.match(/FELONY/) || key.match(/MISDEM/) || key.match(/odyssey-criminal/)){
         return 'criminal';
     } else if (key.match(/TCDISPO/) || key.match(/TIDISPO/) || key.match(/INFRAC/) || key.match(/TRFFIC/)){
         return 'traffic';
@@ -61,11 +61,13 @@ function getPracticeTypeFromKey(key: any): string {
     return '';
 }
 
-export const processCsvImport = async (state: string, county: string) => {
+export const processCsvImport = async (state: string, county: string, setDate: any = false) => {
     try{
         let today = new Date();
-        let todayString = getFormattedDate(today);
-        // let todayString = "2021-05-06";
+        let todayString: any = getFormattedDate(today);
+        if(setDate){
+            todayString = setDate;
+        }
         let folderName = state.toLowerCase() + '/' + county + '/' + todayString;
         let keys = await getKeys(folderName);
         for (const key of keys){

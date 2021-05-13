@@ -25,6 +25,7 @@ setTimeout(() => {
 
 const state: string = process.argv[2];
 const county: string = process.argv[3];
+const datecsv: string = process.argv[4];
 
 async function fetchProduct(productName: string): Promise<any> {
     const {default: Product} = await import(productName);
@@ -57,7 +58,7 @@ async function fetchProduct(productName: string): Promise<any> {
     console.log(data);
 
     let countiesWithCSV: any = {
-      "FL": [ "broward" ]
+      "FL": [ "broward", "pinellas" ]
     };
 
     if(data.length > 0){
@@ -71,7 +72,11 @@ async function fetchProduct(productName: string): Promise<any> {
             for(const countyCsv of countiesWithCSV[stateCsv]){
               if(county == countyCsv){
                 console.log("Processing csv import on:", state, county);
-                await processCsvImport(state, county);
+                if(datecsv){
+                  await processCsvImport(state, county, datecsv);
+                } else {
+                  await processCsvImport(state, county);
+                }
               }
             }
           }
@@ -303,7 +308,7 @@ async function fetchProduct(productName: string): Promise<any> {
     }
 
     if(data.length > 0) {
-      if(data[0].state != 'FL' && data[0].county != 'broward'){
+      if(data[0].state != 'FL' && data[0].county != 'broward' && data[0].county != 'pinellas'){
       const publicRecordProducer: IPublicRecordProducer = await db.models.PublicRecordProducer.findOneAndUpdate({ source: 'property-appraiser-consumer', county: data[0]['county'], state: data[0]['state'] }, { processed: true }); 
 
       const state = publicRecordProducer.state.toLowerCase();
