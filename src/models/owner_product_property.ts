@@ -41,6 +41,8 @@ const schema = new Schema(
         processed: Boolean,
         consumed: Boolean,
         fillingDate: String,
+        csvFillingDate: String,
+        csvCaseNumber: String,
         sourceId: Number,
         codeViolationId: Number,
         count: {

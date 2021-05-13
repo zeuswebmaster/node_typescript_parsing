@@ -52,7 +52,7 @@ const schema = new Schema(
             validate: {
                 validator: function(lastName: string) {
                     if(lastName) {
-                        return /^[a-z\s,.'-]+$/i.test(lastName);
+                        return /^[a-z0-9\s,.'-]+$/i.test(lastName);
                     }
     
                     return true;

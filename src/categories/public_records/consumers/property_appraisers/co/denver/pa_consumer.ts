@@ -124,7 +124,7 @@
 //             let address_input = document["Property Address"];
 //             let retry_count = 0;
 //             while (true){
-//                 if (retry_count > 15){
+//                 if (retry_count > 3){
 //                     console.error('Connection/website error for 15 iteration.');
 //                     this.browser?.close();
 //                     return false;

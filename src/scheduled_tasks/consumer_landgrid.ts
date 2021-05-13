@@ -13,7 +13,7 @@ import { IPublicRecordProducer } from '../models/public_record_producer';
 import { property } from 'lodash';
 import SnsService from '../services/sns_service';
 import { count } from 'console';
-import { consoleLog, logOpp, saveToOwnerProductPropertyByConsumer, updateOldProperty } from '../services/general_service';
+import { consoleLog, hasZipCode, logOpp, saveToOwnerProductPropertyByConsumer, updateOldProperty, checkPropertyZipOnProperty } from '../services/general_service';
 import AddressService from '../services/address_service';
 interface INameResp {
     type: string;
@@ -191,7 +191,13 @@ const landgridPaConsumer = async (publicRecordProducer: IPublicRecordProducer, o
                 let resultAddress = getAddressFromFields(result.fields);
                 console.log(`Address: ${resultAddress.full_address} \n Owner: ${result.fields.owner}, County: ${result.fields.county}`);
     
-                if (result.fields.owner) {   
+                if (result.fields.owner) {
+                    const {scity, szip} = result.fields;
+                    
+                    // address specific
+                    resultObj['Property City'] = scity || publicRecordAttributes['Property City'];
+                    resultObj['Property Zip'] = szip || publicRecordAttributes['Property Zip'];
+
                     // vacancy specific 
                     resultObj['yearbuilt'] = result.fields.yearbuilt;
                     resultObj['usps_vacancy'] = result.fields.usps_vacancy;
@@ -351,7 +357,7 @@ const landgridPaConsumer = async (publicRecordProducer: IPublicRecordProducer, o
                         }
                     }
 
-                    resultObj['Property Zip'] = result.fields.mail_zip;          
+                    // resultObj['Property Zip'] = result.fields.mail_zip;          
                         
                     // vacancy specific 
                     resultObj['yearbuilt'] = result.fields.yearbuilt;
@@ -603,9 +609,11 @@ const landgridPaConsumer = async (publicRecordProducer: IPublicRecordProducer, o
         return false;
     }
     if(ownerProductProperty.processed && ownerProductProperty.consumed){
-        console.log("OPP already completed with PA Consumer:");
-        logOpp(ownerProductProperty);
-        return ownerProductProperty._id;
+        if(ownerProductProperty.propertyId && checkPropertyZipOnProperty(ownerProductProperty.propertyId)){
+            console.log("OPP already completed with PA Consumer:");
+            logOpp(ownerProductProperty);
+            return ownerProductProperty._id;
+        }
     }
     console.log('~~ # ~~ # ~~ # ~~ # ~~ # ~~ # ~~ # ~~ # ~~ # ~~ # ~~ # ~~ # ');
     logOpp(ownerProductProperty);

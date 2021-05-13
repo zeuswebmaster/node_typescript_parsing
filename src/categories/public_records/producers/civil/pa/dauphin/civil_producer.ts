@@ -133,7 +133,7 @@ export default class CivilProducer extends AbstractProducer {
                         }
                         let retry_count = 1;
                         while (true) {
-                            if (retry_count > 15) {
+                            if (retry_count > 3) {
                                 console.log('network issue');
                                 await AbstractProducer.sendMessage('Dauphin', 'Pennsylvania', countRecords, 'Civil & Lien');
                                 return false;
@@ -240,7 +240,7 @@ export default class CivilProducer extends AbstractProducer {
     async waitForSuccess(func: Function): Promise<boolean> {
         let retry_count = 0;
         while (true){
-            if (retry_count > 15){
+            if (retry_count > 3){
                 console.error('Connection/website error for 15 iteration.');
                 return false;
             }

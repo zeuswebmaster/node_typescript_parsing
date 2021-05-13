@@ -44,7 +44,7 @@ export default class PAConsumer extends AbstractPAConsumer {
         } catch (err) {
           console.log(err);
           retries++;
-          if (retries > 15) {
+          if (retries > 3) {
               console.log('******** website loading failed');
               return false;
           }
@@ -213,7 +213,7 @@ export default class PAConsumer extends AbstractPAConsumer {
             }
             let retry_count = 0;
             while (true){
-              if (retry_count > 15){
+              if (retry_count > 3){
                   console.error('Connection/website error for 15 iteration.');
                   return false;
               }
@@ -349,11 +349,6 @@ export default class PAConsumer extends AbstractPAConsumer {
       let property_address_full_arr = property_address_full.split('\n');
       let property_address = property_address_full_arr[0].trim();
       let property_address_parsed = parser.parseLocation(property_address_full);
-      let property_city, property_zip = '';
-      if(property_address_parsed){
-        property_city = property_address_parsed.city || '';
-        property_zip = property_address_parsed.zip || '';
-      }
 
       // mailing address
       const mailing_address_xpath = '//th[text()="Mailing Address:"]/parent::tr/td[1]/text()[1]';
@@ -399,8 +394,6 @@ export default class PAConsumer extends AbstractPAConsumer {
         owner_names, 
         property_address,
         property_address_parsed,
-        property_city,
-        property_zip,
         mailing_address,
         mailing_city,
         mailing_zip,

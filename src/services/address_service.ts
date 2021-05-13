@@ -93,13 +93,13 @@ export default class AddressService {
     //             }
     //             console.log(result)
     //             resolve(result.state || result.city || result.zip_code);
-    //         }); 
-    //     });     
+    //         });
+    //     });
     // }
 
     static getParsedAddress(full_address: string){
         if (!full_address) return null;
-        
+
         const parsev1 = parseaddress.parseLocation(full_address);
         const parsev2 = addressit(full_address);
         let street_address = (parsev2.number ? parsev2.number : '') + ' ' + (parsev2.street ? parsev2.street : '') + ' ' + (parsev2.unit ? '#'+parsev2.unit : '');
@@ -155,18 +155,18 @@ export default class AddressService {
     }
 
     static compareFullAddress(address1: string, address2: string) {
-        let _address1: any = AddressService.getParsedAddress(address1);
-        let _address2: any = AddressService.getParsedAddress(address2);
-        console.log(_address1)
-        console.log(_address2)
+        let _address1: any = AddressService.getParsedAddress(address1) || {};
+        let _address2: any = AddressService.getParsedAddress(address2) || {};
+        // console.log(_address1)
+        // console.log(_address2)
         if (address1 === null || address2 === null) return false;
-        
+
         let flag = false;
         if (_address1.street_address && _address2.street_address) {
             flag = flag || (_address1.street_address.toUpperCase() === _address2.street_address.toUpperCase());
             if(!flag){
-                const parsed_street1 = parseaddress.parseLocation(_address1.street_address);
-                const parsed_street2 = parseaddress.parseLocation(_address2.street_address);
+                const parsed_street1 = parseaddress.parseLocation(_address1.street_address) || {};
+                const parsed_street2 = parseaddress.parseLocation(_address2.street_address) || {};
                 if(parsed_street1.street && parsed_street2.street){
                     flag = flag || (parsed_street1.street.toUpperCase() === parsed_street2.street.toUpperCase());
                 }
@@ -200,7 +200,7 @@ export default class AddressService {
 
     // static async getParsedAddressPython(full_address: string){
     //     if (!full_address) return null;
-        
+
     //     var pythonScriptPath = AddressService.pythonScriptPath;
     //     let options = {
     //       args: [full_address]
@@ -228,8 +228,8 @@ export default class AddressService {
     //                 zip: result.zip_code,
     //                 state: result.state
     //             });
-    //         }); 
-    //     });     
+    //         });
+    //     });
     // }
 
 
@@ -239,7 +239,7 @@ export default class AddressService {
         street_address = street_address.replace(/\s+/, ' ').trim();
         return street_address;
     }
-    
+
     static isEmptyOrSpaces = (str: string) => {
         return str === null || str.match(/^\s*$/) !== null;
     }

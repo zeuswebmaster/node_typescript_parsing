@@ -7,7 +7,7 @@ const nameParsingService = require('./property_appraisers/consumer_dependencies/
 import { IGeoData } from '../../../models/geo_data';
 import { IProperty } from '../../../models/property';
 import { IOwnerProductProperty } from '../../../models/owner_product_property';
-import { saveToOwnerProductPropertyByConsumer, launchBrowser, setParamsForPage, clearPage, randomSleep, logOpp } from '../../../services/general_service';
+import { saveToOwnerProductPropertyByConsumer, launchBrowser, setParamsForPage, clearPage, randomSleep, logOpp, resolveHCaptcha } from '../../../services/general_service';
 
 // config
 import { config as CONFIG } from '../../../config';
@@ -185,7 +185,24 @@ const whitepagesConsumer = async(ownerProductProperty: IOwnerProductProperty, wh
             return false;
         }
         await setParamsForPage(whitepages_page);
-        await whitepages_page.goto(url, {waitUntil: 'load'});
+        await whitepages_page.goto(url, {waitUntil: 'networkidle2'});
+        let [checkHCaptcha] = await whitepages_page.$x('//form[@id="challenge-form"]');
+        if(checkHCaptcha){
+            let [keyHandle] = await whitepages_page.$x('//iframe[contains(@src, "hcaptcha")]');
+            let src = await keyHandle.evaluate(el => el.getAttribute('src'));
+            let siteKey = src?.split('sitekey=')[1].trim();
+            let captchaSolution: any = await resolveHCaptcha(siteKey, whitepages_page.url());
+            let recaptchaHandle = await whitepages_page.$x('//*[contains(@id, "h-captcha-response")]');
+            await recaptchaHandle[0].evaluate((elem, captchaSolution) => elem.innerHTML = captchaSolution, captchaSolution);
+            await Promise.all([
+                whitepages_page.evaluate(() => {
+                    // @ts-ignore
+                    document.querySelector('#challenge-form').submit()
+                }),
+                whitepages_page.waitForNavigation()
+            ]);
+            console.log("Done.");
+        }
         if (await checkForAccessDenied(whitepages_page)) {
             return false;
         }

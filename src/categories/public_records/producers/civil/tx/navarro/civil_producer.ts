@@ -101,7 +101,7 @@ export default class CivilProducer extends AbstractProducer {
             let agreeButton = await page.$('#submitDisclaimerAccept');
             await page.evaluate(el => el.disabled = false, agreeButton);
             await agreeButton?.click();
-            let dateRange = await this.getDateRange('Texas', 'Liberty');
+            let dateRange = await this.getDateRange('Texas', 'Navarro');
             let date = dateRange.from;
             let today = dateRange.to;
             let days = Math.ceil((today.getTime() - date.getTime()) / (1000 * 3600 * 24)) - 1;

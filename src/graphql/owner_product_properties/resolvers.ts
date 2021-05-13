@@ -25,16 +25,18 @@ export default {
                 const currentPage = args['currentPage'] ? args['currentPage'] : 0;
                 const from = args['from'];
                 const to = args['to'];
-                const skipRecords = perPage * (currentPage);
+                const skipRecords = perPage * (currentPage - 1);
                 const selState = args['state'];
                 const selCounty = args['county'];
                 const zip = args['zip'];
+                const productIdsCount = args['owners'];
                 console.log('the from date: ', from);
                 console.log('the to date: ', to);
                 console.log('practiceType: ', practiceType);
                 console.log('state: ', selState);
                 console.log('county: ', selCounty);
                 console.log('zip: ', zip);
+                console.log('productIds count: ', productIdsCount);
 
                 let dateFrom = new Date(new Date(from).setHours(0, 0, 0));
                 let dateTo = new Date(new Date(to).setHours(23, 59, 59))
@@ -49,14 +51,21 @@ export default {
                     propertyId: {$ne: null}
                 };
 
-                if (practiceType !== 'all' || selState !== 'all' || selCounty !== 'all') {
-                    let regexpProduct = `/${selState==='all'?'.*':selState}/${selCounty==='all'?'.*':selCounty}/${practiceType==='all'?'.*':practiceType}$`;
-                    const productIds = await db.models.Product.find({name: {$regex: new RegExp(regexpProduct, 'i')}}).exec();
-                    condition = {...condition, productId: {$in: productIds.map(prod => mongoose.Types.ObjectId(prod.id))}};
+                if (practiceType.length < 30 || selState !== 'all' || selCounty !== 'all') {
+                    let productIdsArr = [];
+                    for(const practice of practiceType){
+                        let regexpProduct = `/${selState==='all'?'.*':selState}/${selCounty==='all'?'.*':selCounty}/${practice}$`;
+                        console.log(regexpProduct);
+                        const productIds = await db.models.Product.find({name: {$regex: new RegExp(regexpProduct, 'i')}}).exec();
+                        for(const productId of productIds){
+                            productIdsArr.push(productId._id);
+                        }
+                    }
+                    condition = {...condition, productId: { $in: productIdsArr }};
                 }
 
                 console.log('ensure performance index exists on condition: ', condition);
-                const aggregateConditions: any[] = [
+                let aggregateConditions: any[] = [
                     {$lookup: {from: 'properties', localField: 'propertyId', foreignField: '_id', as: 'property'}},
                     {$unwind: "$property"},
                     {$lookup: {from: 'owners', localField: 'ownerId', foreignField: '_id', as: 'owner'}},
@@ -77,14 +86,29 @@ export default {
                       }
                     )
                   }
+                
+                if(productIdsCount != '' && productIdsCount != 'all'){
+                    aggregateConditions.push(
+                        {
+                            $group: {
+                                _id: { ownerId: "$ownerId" },
+                                uniqueIds: { $addToSet: "$_id" },
+                                count: { $sum: 1 } 
+                                } }, 
+                            { $match: { 
+                                count: { $eq: parseInt(productIdsCount) } 
+                            }
+                        }
+                    )
+                }
 
-                const docs: any[] = await db.models.OwnerProductProperty.aggregate([
+
+                let docs: any[] = await db.models.OwnerProductProperty.aggregate([
                     { $match: condition },
                     {$skip: skipRecords },
                     ...aggregateConditions
                     ])
                     .limit(perPage);
-
                 const countField = 'createdAt'
                 let match: any[] = []
                 if (zip) {
@@ -131,9 +155,39 @@ export default {
                     'personal-injury': 'Personal Injury',
                     'marriage': 'Marriage',
                     'child-support': 'Child Support',
+                    'criminal': 'Criminal',
+                    'insurance-claims': 'Insurance Claims',
+                    'employment-discrimination': 'Employment Discrimination',
+                    'traffic': 'Traffic',
+                    'property-defect': 'Property Defect',
+                    'declaratory-judgment': 'Declaratory Judgment',
                     'other-civil': 'Other Civil',
                 };
                 console.log('size should be no more than maximum pagination size: ', docs.length);
+
+                if(productIdsCount != '' && productIdsCount != 'all'){
+                    let uniqueIds = [];
+                    for(const doc of docs){
+                        for(const uniqueId of doc.uniqueIds){
+                            uniqueIds.push(uniqueId);
+                        }
+                    }
+                    let aggregateConditions: any[] = [
+                        {$lookup: {from: 'properties', localField: 'propertyId', foreignField: '_id', as: 'property'}},
+                        {$unwind: "$property"},
+                        {$lookup: {from: 'owners', localField: 'ownerId', foreignField: '_id', as: 'owner'}},
+                        {$unwind: "$owner"},
+                        {$lookup: {from: 'products', localField: 'productId', foreignField: '_id', as: 'product'}},
+                        {$unwind: "$product"},
+                    ];
+                    condition = {
+                        _id: { $in: uniqueIds }
+                    };
+                    docs = await db.models.OwnerProductProperty.aggregate([
+                        { $match: condition },
+                        ...aggregateConditions
+                        ])
+                }
 
                 const records: any[] = [];
                 for(const doc of docs) {
@@ -168,6 +222,14 @@ export default {
                             if (!mailing_zip) mailing_zip = parsed_address.zip;
                         }
                     }
+
+                    if(property_zip == '' && mailing_zip != ''){
+                        if(AddressService.compareFullAddress(property_address, mailing_address) && (property_state == mailing_state)){
+                            property_zip = mailing_zip;
+                            if(property_city == '') property_city = mailing_city;
+                        }
+                    }
+                    
                     record['Created At'] = moment(doc['createdAt']).format('MM-DD-YYYY').toString();
                     record['Updated At'] = moment(doc['updatedAt']).format('MM-DD-YYYY').toString();
                     const practiceType = doc['product']?.['name']?.split('/')[3]?.trim()
@@ -233,6 +295,7 @@ export default {
                     record['Lien Amount'] = doc['property']['Lien Amount'];
                     record['Est. Remaining balance of Open Loans'] = doc['property']['Est. Remaining balance of Open Loans'];
                     record['Tax Lien Year'] = doc['property']['Tax Lien Year'];
+                    record['propertyFrom'] = doc['property']['propertyFrom'];
 
                     records.push(record);
                 }

@@ -23,6 +23,7 @@ import zillowConsumer from '../scheduled_tasks/consumer_zillow';
 import totalviewConsumer from '../scheduled_tasks/consumer_totalview_realestate';
 import whitepagesConsumer from '../categories/public_records/consumers/whitepages_consumer';
 import title from '../routes/title';
+
 const parseaddress = require('parse-address');
 
 const doctype_to_practicetype: any = doctype_to_practicetype_;
@@ -65,6 +66,28 @@ export const hasLastSaleRecordDate = (data: any) => {
                 return false;
             }
         }
+        return true;
+    }
+    return false;
+}
+
+export const hasZipCode = (data: any) => {
+    if (data && !isEmptyOrSpaces(data)) {
+        return true;
+    }
+    return false;
+}
+
+export const checkPropertyZipOnOpp = async (_id: any) => {
+    let ownerProductProperty = await db.models.OwnerProductProperty.findOne({_id}).populate('ownerId propertyId');
+    if(ownerProductProperty && ownerProductProperty.propertyId && ownerProductProperty.propertyId['Property Zip'] && hasZipCode(ownerProductProperty.propertyId['Property Zip'])){
+        return true;
+    }
+    return false;
+}
+
+export const checkPropertyZipOnProperty = (property: IProperty) => {
+    if(property && property['Property Zip'] && hasZipCode(property['Property Zip'])){
         return true;
     }
     return false;
@@ -131,13 +154,15 @@ export const createNewOwner = async (data: any) => {
 }
 
 const fillOwnerData = (dataForOwner: any, data: any) => {
-    if (data['Mailing Address'] && data['Mailing Address'].match(/po\s+box|^c\/o|^%\s+/i)) {
-        if (data['Property Address']) {
-            dataForOwner['Mailing Address'] = data['Property Address'] || '';
-            dataForOwner['Mailing Unit #'] = data['Property Unit #'] || '';
-            dataForOwner['Mailing City'] = data['Property City'] || '';
-            dataForOwner['Mailing State'] = data['Property State'] || '';
-            dataForOwner['Mailing Zip'] = data['Property Zip'] || '';
+    if (data['Mailing Address']) {
+        if(data['Mailing Address'].match(/po\s+box|^c\/o|^%\s+/i) || !data['Mailing Address'].match(/\d/)){
+            if (data['Property Address']) {
+                dataForOwner['Mailing Address'] = data['Property Address'] || '';
+                dataForOwner['Mailing Unit #'] = data['Property Unit #'] || '';
+                dataForOwner['Mailing City'] = data['Property City'] || '';
+                dataForOwner['Mailing State'] = data['Property State'] || '';
+                dataForOwner['Mailing Zip'] = data['Property Zip'] || '';
+            }
         }
     } else {
         dataForOwner = fillData(dataForOwner, data, 'Mailing Care of Name', '');
@@ -246,6 +271,7 @@ const fillPropertyData = (dataForProperty: any, data: any) => {
     dataForProperty = fillData(dataForProperty, data, 'practiceType', null);
     dataForProperty = fillData(dataForProperty, data, 'Toal Open Loans', null);
     dataForProperty = fillData(dataForProperty, data, 'Tax Lien Year', null);
+    dataForProperty = fillData(dataForProperty, data, 'propertyFrom', '');
     if(dataForProperty['Property City'] && dataForProperty['Property Address'] && dataForProperty['Property City'] !== '' && dataForProperty['Property Address'] !== ''){
         const parsed_street = parseaddress.parseLocation(dataForProperty['Property Address']);
         if(parsed_street && parsed_street.type){
@@ -258,8 +284,6 @@ const fillPropertyData = (dataForProperty: any, data: any) => {
 }
 
 const preprocess = (data: any) => {
-    if (data['Full Name'])
-        data['Full Name'] = data['Full Name'].replace(/\W/gm,' ').replace(/\s+|\n/gm, ' ').trim();
     if (data['Last Sale Recording Date'])
         data['Last Sale Recording Date'] = normalizeDate(data['Last Sale Recording Date']);
     if (data['yearBuilt'] && typeof data['yearBuilt'] !== 'string')
@@ -271,6 +295,14 @@ const preprocess = (data: any) => {
             data[key] = data[key].replace(/\s+/g, ' ').trim();
         }
     }
+    if(data['Property Zip'] && data['Mailing Zip']){
+        if(data['Property Zip'] == '' && data['Mailing Zip'] != ''){
+            if(AddressService.compareFullAddress(data['Property Address'], data['Mailing Address']) && (data['Property State'] == data['Mailing State'])){
+                data['Property Zip'] = data['Mailing Zip'];
+                if(data['Property City'] && data['Property City'] == '') data['Property City'] = data['Mailing City'] || '';
+            }
+        }
+    }
     return data;
 }
 
@@ -280,9 +312,12 @@ export const saveToOwnerProductPropertyByConsumer = async (ownerProductProperty:
     let product_id = ownerProductProperty.productId;
 
     data = preprocess(data);
-    if(data['Full Name'] && data['Full Name'].match(/^n\s+a$/mi)){
-        return false;
+    if(data['Full Name']){
+        if(data['Full Name'].match(/^n\s+a$/mi) || !data['Full Name'].match(/\w{2,}/gm)){
+            return false;
+        }
     }
+    data['propertyFrom'] = 'Property Appraiser';
     console.log(data);
 
     try{
@@ -300,7 +335,7 @@ export const saveToOwnerProductPropertyByConsumer = async (ownerProductProperty:
             }
 
             let property = await db.models.Property.findOne({ _id: ownerProductProperty.propertyId });
-            if(hasLastSaleRecordDate(property['Last Sale Recording Date']))
+            if(hasLastSaleRecordDate(property['Last Sale Recording Date']) && checkPropertyZipOnProperty(property))
                 console.log("=== PROPERTY:",property._id,"ALREADY COMPLETED ===");
             else
                 property = await updateOldProperty(property, data);
@@ -308,6 +343,9 @@ export const saveToOwnerProductPropertyByConsumer = async (ownerProductProperty:
         }
         else { // Search by name
             console.log("=== SEARCHED BY NAME ===");
+            if(ownerProductProperty.ownerId['Full Name'].match(/^n\s+a$/mi) || !ownerProductProperty.ownerId['Full Name'].match(/\w{2,}/gm)){
+                return false;
+            }
             let oldProperty = await db.models.Property.findOne({ $or: [{ 'Property Address': data['Property Address'] }, { 'Property Address': data['Property Address'].toUpperCase() }], 'County': normalizeStringForMongo(data['County']), 'Property State': data['Property State']});
             if(oldProperty){              
                 oldProperty = await updateOldProperty(oldProperty, data);
@@ -416,33 +454,34 @@ export const saveToOwnerProductPropertyByProducer = async (
         let property = null;
         let product_id = data['productId'];
         data = preprocess(data);
-        if(data['Full Name'] && data['Full Name'].match(/^n\s+a$/mi)){
-            return false;
+        if(data['Full Name']){
+            if(data['Full Name'].match(/^n\s+a$/mi) || !data['Full Name'].match(/\w{2,}/gm)){
+                return false;
+            }
         }
-        const exceptionNames = ['bank of america', normalizeStringForMongo(data['County']), 'state of', 'wells fargo', 'insurance', 'geico'];
-
+        
         console.log('///// OWNER');
         if (data['Full Name']) {
-            const exceptionNamesString = `\\b(?:${exceptionNames.join('|')})\\b`;
-            const exceptionNamesRegex = new RegExp(exceptionNamesString, 'i');
-            if(data['Full Name'].match(exceptionNamesRegex)){
-                console.log('Name is identified as a bussiness!');
+            const parseName: any = nameParsingService.newParseName(data['Full Name'].trim())
+            if (parseName?.type && parseName?.type == 'COMPANY') return false;
+
+            owner = await db.models.Owner.findOne({ 'Full Name': data['Full Name'], 'County': normalizeStringForMongo(data['County']), 'Property State': data['Property State'] });
+            if (!owner) {
+                owner = await createNewOwner(data);
+                console.log('--- NEW');
             } else {
-                owner = await db.models.Owner.findOne({ 'Full Name': data['Full Name'], 'County': normalizeStringForMongo(data['County']), 'Property State': data['Property State'] });
-                if (!owner) {
-                    owner = await createNewOwner(data);
-                    console.log('--- NEW');
-                } else {
-                    owner = await updateOldOwner(owner, data);
-                    console.log('--- OLD');
-                }
-                owner_id = owner._id;
-                consoleLog(owner);
+                owner = await updateOldOwner(owner, data);
+                console.log('--- OLD');
             }
+            owner_id = owner._id;
+            consoleLog(owner);
         }
 
         console.log('///// PROPERTY');
         if (data['Property Address']) {
+            if(!data['propertyFrom']){
+                data['propertyFrom'] = 'Civil Scraper';
+            }
             property = await db.models.Property.findOne({ $or: [{ 'Property Address': data['Property Address'] }, { 'Property Address': data['Property Address'].toUpperCase() }] , 'County': normalizeStringForMongo(data['County']), 'Property State': data['Property State'] });
             if(!property){
                 property = await createNewProperty(data);
@@ -456,6 +495,7 @@ export const saveToOwnerProductPropertyByProducer = async (
         }
 
         console.log('///// OWNER_PRODUCT_PROPERTY')
+        let filledOpp = false; // If the owner doesn't have property but on database already the data with property, it will not run property appraiser.
         if (owner_id === null && property_id === null) {
             return false;
         }
@@ -469,21 +509,42 @@ export const saveToOwnerProductPropertyByProducer = async (
             let opp_id = null;
             let ownerProductProperty = await db.models.OwnerProductProperty.findOne({ ownerId: owner_id, propertyId: property_id, productId: product_id });
             if (!ownerProductProperty) {
-                let dataForOwnerProductProperty = {
-                    ownerId: owner_id,
-                    propertyId: property_id,
-                    productId: product_id,
-                    processed: processed,
-                    consumed: consumed,
-                    fillingDate: data.fillingDate,
-                    originalDocType: data.originalDocType,
-                    sourceId: data.sourceId,
-                    codeViolationId: data.codeViolationId
+                if(property_id === null){
+                    let checkOppAgain = await db.models.OwnerProductProperty.findOne({ ownerId: owner_id, propertyId: { $exists: true }, productId: product_id });
+                    if(checkOppAgain){
+                        opp_id = checkOppAgain._id;
+                        console.log(`--- OLD OWNER_PRODUCT_PROPERTY (ALREADY PROCESSED) id = ${opp_id}`);
+                        filledOpp = true;
+                        ownerProductProperty = checkOppAgain;
+                    }
+                } else if (owner_id === null){
+                    let checkOppAgain = await db.models.OwnerProductProperty.findOne({ ownerId: { $exists: true }, propertyId: property_id, productId: product_id });
+                    if(checkOppAgain){
+                        opp_id = checkOppAgain._id;
+                        console.log(`--- OLD OWNER_PRODUCT_PROPERTY (ALREADY PROCESSED) id = ${opp_id}`);
+                        filledOpp = true;
+                        ownerProductProperty = checkOppAgain;
+                    }
                 }
-                ownerProductProperty = new PublicRecordOwnerProductProperty(dataForOwnerProductProperty);
-                await ownerProductProperty.save();
-                opp_id = ownerProductProperty._id;
-                console.log(`--- NEW OWNER_PRODUCT_PROPERTY id = ${opp_id}`);
+                if(!filledOpp){
+                    let dataForOwnerProductProperty = {
+                        ownerId: owner_id,
+                        propertyId: property_id,
+                        productId: product_id,
+                        processed: processed,
+                        consumed: consumed,
+                        fillingDate: data.fillingDate,
+                        csvFillingDate: data.csvFillingDate,
+                        csvCaseNumber: data.csvCaseNumber,
+                        originalDocType: data.originalDocType,
+                        sourceId: data.sourceId,
+                        codeViolationId: data.codeViolationId
+                    }
+                    ownerProductProperty = new PublicRecordOwnerProductProperty(dataForOwnerProductProperty);
+                    await ownerProductProperty.save();
+                    opp_id = ownerProductProperty._id;
+                    console.log(`--- NEW OWNER_PRODUCT_PROPERTY id = ${opp_id}`);
+                }
             } else {
                 if (owner_id !== null && property_id !== null) {
                     await db.models.OwnerProductProperty.deleteOne({ownerId: owner_id, propertyId: null});
@@ -491,8 +552,10 @@ export const saveToOwnerProductPropertyByProducer = async (
                 }
                 ownerProductProperty.originalDocType = data.originalDocType;
                 ownerProductProperty.fillingDate = data.fillingDate;
+                ownerProductProperty.csvFillingDate = data.csvFillingDate;
+                ownerProductProperty.csvCaseNumber = data.csvCaseNumber;
                 ownerProductProperty.processed = processed;
-                ownerProductProperty.consumed = consumed;
+                // ownerProductProperty.consumed = consumed;
                 await ownerProductProperty.save();
                 opp_id = ownerProductProperty._id;
                 console.log(`--- OLD OWNER_PRODUCT_PROPERTY id = ${opp_id}`);
@@ -501,7 +564,7 @@ export const saveToOwnerProductPropertyByProducer = async (
             console.log("=== DONE SAVED TO OWNER PRODUCT PROPERTY ===");
             console.log('================================================= //');
 
-            if(!consumed && publicRecordProducer && county_page && whitepages_page && realtor_page && totalview_page){
+            if(!filledOpp && !consumed && publicRecordProducer && county_page && whitepages_page && realtor_page && totalview_page){
                 try{
                     await ( async () => {
                         if(!publicRecordProducer.county){
@@ -515,9 +578,9 @@ export const saveToOwnerProductPropertyByProducer = async (
                         opp_id = await consumeByCountyPA(publicRecordProducer, ownerProductProperty, county_browser, county_page) || opp_id;
                         ownerProductProperty = await processOpp(opp_id);
                         result = ownerProductProperty.processed && ownerProductProperty.consumed;
-                        if (result) {
+                        if (result && checkPropertyZipOnProperty(ownerProductProperty.propertyId)) {
                             // get phone number with whitepages consumer
-                            opp_id = await whitepagesConsumer(ownerProductProperty, whitepages_page) || opp_id;
+                            // opp_id = await whitepagesConsumer(ownerProductProperty, whitepages_page) || opp_id;
                             return opp_id;
                         };
                         
@@ -527,28 +590,33 @@ export const saveToOwnerProductPropertyByProducer = async (
                             ownerProductProperty = await processOpp(opp_id);
                             result = ownerProductProperty.processed && ownerProductProperty.consumed;
                         }
-                        // if (result) { return opp_id }; // commented because we need to run whitepages to get phone number
+                        if (result && checkPropertyZipOnProperty(ownerProductProperty.propertyId)) { return opp_id }; // commented because we need to run whitepages to get phone number
 
                         // consume by whitepages
                         if (!ownerProductProperty.processed) {
-                            opp_id = await whitepagesConsumer(ownerProductProperty, whitepages_page) || opp_id;
-                            ownerProductProperty = await processOpp(opp_id);
-                            result = ownerProductProperty.processed && ownerProductProperty.consumed;
-                            if (result) { return opp_id };
-                            if (!ownerProductProperty.processed) {
-                                if (ownerProductProperty.count) ownerProductProperty.count++; else ownerProductProperty.count = 0;
+                            if(ownerProductProperty.propertyId){
+                                opp_id = await whitepagesConsumer(ownerProductProperty, whitepages_page) || opp_id;
+                                ownerProductProperty = await processOpp(opp_id);
+                                result = ownerProductProperty.processed && ownerProductProperty.consumed;
+                                if (result && checkPropertyZipOnProperty(ownerProductProperty.propertyId)) { return opp_id };
+                                if (!ownerProductProperty.processed) {
+                                    if (typeof ownerProductProperty.count === 'number') ownerProductProperty.count++; else ownerProductProperty.count = 0;
+                                    await ownerProductProperty.save();
+                                    return opp_id;
+                                }
+                            } else {
+                                if (typeof ownerProductProperty.count === 'number') ownerProductProperty.count++; else ownerProductProperty.count = 0;
                                 await ownerProductProperty.save();
                                 return opp_id;
                             }
                         }
+                        // consume by totalview
+                        let ret = await totalviewConsumer(ownerProductProperty, totalview_page);
+                        if (ret) { return opp_id };
 
                         // consume by realtor
-                        let ret = await realtorConsumer(ownerProductProperty, realtor_page);
+                        ret = await realtorConsumer(ownerProductProperty, realtor_page);
                         if(ret) { return opp_id };
-
-                        // consume by totalview
-                        ret = await totalviewConsumer(ownerProductProperty, totalview_page);
-                        if (ret) { return opp_id };
 
                         if (typeof ownerProductProperty.count === 'number') ownerProductProperty.count++; else ownerProductProperty.count = 0;
                         await ownerProductProperty.save();
@@ -570,7 +638,7 @@ export const saveToOwnerProductPropertyByProducer = async (
 // ========  reCaptcha 
 // ==========================================
 
-const TWO_CAPTCHA_KEY = 'd0f7e59a400654e707ef6bcd25ab0be0'; // config.two_captcha_key;
+const TWO_CAPTCHA_KEY = 'f11683621d303b72ca1b1f02b9692ce1'; // config.two_captcha_key;
 
 // reCaptcha2
 const initiateCaptcha2Request = async (siteKey: any, pageUrl: any) => {
@@ -649,14 +717,19 @@ const requestCaptcha2Results = async (requestId: any) => {
     const url = `http://2captcha.com/res.php?key=${TWO_CAPTCHA_KEY}&action=get&id=${requestId}&json=1`;
 
     return new Promise(async (resolve, reject) => {
-        const rawResponse = await axios.get(url);
-        const resp = rawResponse.data;
-        if (resp.status === 0) {
-            console.log(resp);
-            return reject(resp.request);
+        try{
+            const rawResponse = await axios.get(url);
+            const resp = rawResponse.data;
+            if (resp.status === 0) {
+                console.log(resp);
+                return reject(resp.request);
+            }
+            console.log(resp)
+            return resolve(resp.request);
+        } catch(e){
+            console.log(e.message);
+            return reject(e.message);
         }
-        console.log(resp)
-        return resolve(resp.request);
     })
 }
 
@@ -760,6 +833,78 @@ const sendRecaptchaZeroMessage = async () => {
     await snsService.publish(topicName, content);
 }
 
+export const resolveHCaptcha = async (siteKey: any, pageUrl: any, maxTryNo = 7) => {
+    try {
+        const reqId = await initiateHCaptchaRequest(siteKey, pageUrl);
+        console.log('captcha requested. awaiting results.')
+        await sleep(20000);
+        for (let tryNo = 1; tryNo <= maxTryNo; tryNo++) {
+            try {
+                const result = await requestCaptcha2Results(reqId);
+                console.log(result);
+                let status = await db.models.Status.findOne();
+                if (!status) {
+                    status = new PublicStatus({ recaptcha_balance_zero: false});
+                    await status.save();
+                }
+                if (status.recaptcha_balance_zero) {
+                    status.recaptcha_balance_zero = false;
+                    await status.save();
+                }
+                return Promise.resolve(result);
+            } catch (err) {
+                console.warn(err);
+                await sleep(20000);
+            }
+        }
+        Promise.reject('Captcha not found within time limit');
+    } catch (err) {
+        if (err === 'ERROR_ZERO_BALANCE') {
+            let status = await db.models.Status.findOne();
+            if (!status) {
+                status = new PublicStatus({ recaptcha_balance_zero: false});
+                await status.save();
+            }
+            if (!status.recaptcha_balance_zero) {
+                // send sns
+                await sendRecaptchaZeroMessage();
+            }
+            status.recaptcha_balance_zero = true;
+            await status.save();
+        }
+        console.warn(err);
+        Promise.reject(err);
+    }
+}
+
+const initiateHCaptchaRequest = async (siteKey: any, pageUrl: any) => {
+    const formData = {
+        method: 'hcaptcha',
+        sitekey: siteKey,
+        key: TWO_CAPTCHA_KEY,
+        pageurl: pageUrl,
+        json: 1
+    };
+
+    try {
+        const resp = await axios.post('https://2captcha.com/in.php', formData);
+        if (resp.status == 200) {
+            const respObj = resp.data;
+            console.log(respObj)
+            if (respObj.status == 0) {
+                return Promise.reject(respObj.request);
+            } else {
+                return Promise.resolve(respObj.request);
+            }
+        } else {
+            console.warn(`2Captcha request failed, Status Code: ${resp.status}, INFO: ${resp.data}`);
+            return Promise.reject('Error');
+        }
+    } catch (err) {
+        return Promise.reject(err);
+    }
+}
+
 //////////////////////////////////////////
 // puppeteer
 //////////////////////////////////////////
@@ -768,6 +913,17 @@ export const launchBrowser = async (): Promise<puppeteer.Browser> => {
     return await puppeteer.launch({
         headless: config.puppeteer_headless,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        ignoreDefaultArgs: ['--disable-extensions'],
+        ignoreHTTPSErrors: true,
+        timeout: 60000
+    });
+}
+
+export const launchTorBrowser = async (): Promise<puppeteer.Browser> => {
+    console.log('--= Launching Tor Browser =--');
+    return await puppeteer.launch({
+        headless: config.puppeteer_headless,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--proxy-server=socks5://52.23.34.138:9050'],
         ignoreDefaultArgs: ['--disable-extensions'],
         ignoreHTTPSErrors: true,
         timeout: 60000
@@ -896,7 +1052,7 @@ const consumeByCountyPA = async (publicRecordProducer: IPublicRecordProducer, ow
 const consumeByLandgrid = async (publicRecordProducer: IPublicRecordProducer, ownerProductProperty: IOwnerProductProperty) => {
     try {
         let opp = await db.models.OwnerProductProperty.findOne({_id: ownerProductProperty._id});
-        if (opp.processed) return true;
+        if (opp.processed && checkPropertyZipOnProperty(opp.propertyId)) return opp._id;
         return landgridPaConsumer(publicRecordProducer, ownerProductProperty);
     } catch (error) {
         console.log('[ERROR - Landgrid Consumer] - ', error);

@@ -1,5 +1,5 @@
 extend type Query {
-    fetchOwnerProductProperties(token: String!, from: String!, to: String!,perPage: Int, currentPage: Int, practiceType: String, filters: String, count: Int!, state: String, county: String, zip: String ): OwnerProductProperty
+    fetchOwnerProductProperties(token: String!, from: String!, to: String!,perPage: Int, currentPage: Int, practiceType: [String], filters: String, count: Int!, state: String, county: String, zip: String, owners: String): OwnerProductProperty
 }
 
 type OwnerProductProperty {

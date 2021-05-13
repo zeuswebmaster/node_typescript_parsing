@@ -53,8 +53,9 @@ Removal of Tenant Non-Residential & Dmgs is eviction
 CC Equity </= $15,000 is civil  
 Chapter 82 - Unlawful Detainer is eviction  
 SC Property Insurance Claim > $500 - $2,500 is insurance-claims  
-SC Damages is debt  
-CC Damages is debt  
+SC Damages is debt, we want pls  
+CC Damages is debt, we want dfs  
+all Small Claims + - Damages is debt  
 In the case of Real Property/Mortgage Foreclosure $1 - $15,000, we want defs  
 In the case of CC Credit Card Debt, we want defs  
 In case of SC Property Insurance Claim, we want pls  
@@ -65,8 +66,12 @@ In case of CC Equity, we want defs
 CC Replevin >$15,000 - $30,000 is debt, we want defs  
 Civil Restitution Lien is debt, store defs  
 "XX Auto Recovery" is insurance-claim store defs  
-Neg - Negligent Security is personal-injury, store defs
-Neg - Construction Defect is property-defect, store pls
+Neg - Negligent Security is personal-injury, store defs  
+Neg - Construction Defect is property-defect, store pls  
+Trust Litigation is pre-inheritence, we want both pls and defs.  
+Evictions < $15,000 is eviction practice type, we want pls.  
+Medical Malpractice, Other Professional Malpractice is injury practice type, we want both dfs and pls.  
+
 -  Criminal  
 Store felony and misdemeanor cases as criminal, and save the defs
 

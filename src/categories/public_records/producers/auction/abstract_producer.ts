@@ -28,16 +28,17 @@ export default abstract class AbstractProducer {
     // Send Notification   
     ///////////////////////////////////////////////////////////////////////
     static async sendMessage(county: string, state: string, countRecords: number, sourceType: string) {
-        const snsService = new SnsService();
-        let topicName = SnsService.CIVIL_TOPIC_NAME;
-        if (! await snsService.exists(topicName)) {
-            await snsService.create(topicName);
-        }
+        // const snsService = new SnsService();
+        // let topicName = SnsService.CIVIL_TOPIC_NAME;
+        // if (! await snsService.exists(topicName)) {
+        //     await snsService.create(topicName);
+        // }
 
-        if (! await snsService.subscribersReady(topicName, SnsService.CIVIL_UPDATE_SUBSCRIBERS)) {
-            await snsService.subscribeList(topicName);
-        }
-        await snsService.publish(topicName, `${county} county, ${state} total ${sourceType} data saved: ${countRecords}`);
+        // if (! await snsService.subscribersReady(topicName, SnsService.CIVIL_UPDATE_SUBSCRIBERS)) {
+        //     await snsService.subscribeList(topicName);
+        // }
+        // await snsService.publish(topicName, `${county} county, ${state} total ${sourceType} data saved: ${countRecords}`);
+        console.log(`${county} county, ${state} total ${sourceType} data saved: ${countRecords}`);
     }
 
     constructor(publicRecordProducer: IPublicRecordProducer) {

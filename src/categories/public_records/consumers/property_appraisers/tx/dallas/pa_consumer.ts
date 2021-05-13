@@ -84,7 +84,7 @@ export default class PAConsumer extends AbstractPAConsumer {
           } catch (err) {
             console.log(err);
             retries++;
-            if (retries > 15) {
+            if (retries > 3) {
                 console.log('******** website loading failed');
                 return false;
             }
@@ -249,7 +249,7 @@ export default class PAConsumer extends AbstractPAConsumer {
                         break;
                     } catch (err) {
                         retries++;
-                        if (retries > 15) {
+                        if (retries > 3) {
                             console.log('******** website loading failed');
                             return false;
                         }

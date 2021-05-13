@@ -94,7 +94,7 @@ export default class PAConsumer extends AbstractPAConsumer {
           } catch (err) {
             console.log(err);
             retries++;
-            if (retries > 15) {
+            if (retries > 3) {
                 console.log('******** website loading failed');
                 return false;
             }
@@ -250,7 +250,7 @@ export default class PAConsumer extends AbstractPAConsumer {
         let mailing_state = mailing_address_2_arr.pop().trim();
         let mailing_city = '';
         for(const word of mailing_address_2_arr){
-            mailing_city += word;
+            mailing_city += word + ' ';
         }
         mailing_city = mailing_city.trim();
 

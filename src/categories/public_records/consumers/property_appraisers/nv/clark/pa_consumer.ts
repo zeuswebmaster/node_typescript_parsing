@@ -53,7 +53,7 @@ export default class PAConsumer extends AbstractPAConsumer {
           } catch (err) {
             console.log(err);
             retries++;
-            if (retries > 15) {
+            if (retries > 3) {
                 console.log('******** website loading failed');
                 return false;
             }
@@ -375,7 +375,7 @@ export default class PAConsumer extends AbstractPAConsumer {
             console.log(error);
         }
 
-        const yearBuilt = this.getTextContentByXpathFromPage(page, '//span[@id="lblConstrYr"]');
+        const yearBuilt = await this.getTextContentByXpathFromPage(page, '//span[@id="lblConstrYr"]');
 
         return { propertyAddress, fullName, firstName,totalAssessedValue,
             lastName, midleName, nameSuffix, mailingAddress, mailingCity,

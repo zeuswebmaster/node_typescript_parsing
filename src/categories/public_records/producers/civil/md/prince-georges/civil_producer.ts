@@ -4,7 +4,7 @@ import CivilProducerMD from "../casesearch_md";
 export default class CivilProducer extends CivilProducerMD {
     state = 'MD';
     fullState = 'Maryland';
-    county = 'prince-george';
+    county = 'prince-georges';
     fullcounty = "Prince George's";
     
     constructor(publicRecordProducer: IPublicRecordProducer) {

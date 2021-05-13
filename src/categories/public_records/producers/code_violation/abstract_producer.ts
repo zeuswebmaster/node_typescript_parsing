@@ -92,16 +92,16 @@ export default abstract class AbstractProducer {
     // Send Notification   
     ///////////////////////////////////////////////////////////////////////
     static async sendMessage(county: string, state: string, countRecords: number, sourceType: string) {
-        const snsService = new SnsService();
-        let topicName = SnsService.CIVIL_TOPIC_NAME;
-        if (! await snsService.exists(topicName)) {
-            await snsService.create(topicName);
-        }
+        // const snsService = new SnsService();
+        // let topicName = SnsService.CIVIL_TOPIC_NAME;
+        // if (! await snsService.exists(topicName)) {
+        //     await snsService.create(topicName);
+        // }
 
-        if (! await snsService.subscribersReady(topicName, SnsService.CIVIL_UPDATE_SUBSCRIBERS)) {
-            await snsService.subscribeList(topicName);
-        }
-        await snsService.publish(topicName, `${county} county, ${state} total ${sourceType} data saved: ${countRecords}`);
+        // if (! await snsService.subscribersReady(topicName, SnsService.CIVIL_UPDATE_SUBSCRIBERS)) {
+        //     await snsService.subscribeList(topicName);
+        // }
+        console.log(`${county} county, ${state} total ${sourceType} data saved: ${countRecords}`);
     }
 
     constructor(publicRecordProducer: IPublicRecordProducer, refetch: boolean) {
@@ -207,7 +207,7 @@ export default abstract class AbstractProducer {
             ]}).sort({codeViolationId: -1}).exec();
         console.log(lastItemDB)
 
-        const DATERANGE = process.env.NODE_ENV === 'test' ? 60 : 60;
+        const DATERANGE = process.env.NODE_ENV === 'test' ? 30 : 30;
         if(lastItemDB && !this.refetch){
             let codeViolationId = lastItemDB.codeViolationId;
             if (isDate) {
@@ -304,7 +304,7 @@ export default abstract class AbstractProducer {
 
     async openPage(page: puppeteer.Page, link: string, xpath: string) {
         let retries = 0;
-        while (retries < 15) {
+        while (retries < 3) {
             try {
                 console.log(link);
                 await page.goto(link, {waitUntil: 'load'});
@@ -474,7 +474,7 @@ export default abstract class AbstractProducer {
     //   "productId": prod._id
     // }
     async civilAndLienSaveToNewSchema(data: any){
-        return await saveToOwnerProductPropertyByProducer(data, this.publicRecordProducer);
+        return await saveToOwnerProductPropertyByProducer(data, this.publicRecordProducer, this.county_page, this.whitepages_page, this.realtor_page, this.totalview_page);
     }
 
     // get data from code violation api

@@ -46,7 +46,7 @@ export default abstract class NewJerseyPAConsumer extends AbstractPAConsumer {
         } catch (err) {
           console.log(err);
           retries++;
-          if (retries > 15) {
+          if (retries > 3) {
               console.log('******** website loading failed');
               return false;
           }
@@ -210,7 +210,7 @@ export default abstract class NewJerseyPAConsumer extends AbstractPAConsumer {
 
             let retry_count = 0;
             while (true){
-              if (retry_count > 15){
+              if (retry_count > 3){
                   console.error('Connection/website error for 15 iteration.');
                   return false;
               }
@@ -327,18 +327,8 @@ export default abstract class NewJerseyPAConsumer extends AbstractPAConsumer {
       owner_names.push(parseName);
 
       // property address
-      const property_address_xpath = '//td[contains(., "Street:")]/ancestor::tr/td[6]/font';
-      const property_address_2_xpath = '//td[contains(., "City State:")]/ancestor::tr/td[6]/font';
+      const property_address_xpath = '//td[contains(., "Prop Loc:")]/following::*[1]/font';
       let property_address = await this.getTextByXpathFromPage(page, property_address_xpath);
-      let property_address_2 = await this.getTextByXpathFromPage(page, property_address_2_xpath);
-      let property_address_2_arr = property_address_2.split(/\s+/g);
-      let property_zip = property_address_2_arr.pop();
-      let property_state = property_address_2_arr.pop();
-      let property_city = '';
-      for (const word of property_address_2_arr){
-        property_city += word + " ";
-      }
-      property_city = property_city.replace(",","").replace("/","").trim();
 
       console.log('Property Address from web: ', property_address);
       let property_address_parsed = parser.parseLocation(property_address);
@@ -360,6 +350,13 @@ export default abstract class NewJerseyPAConsumer extends AbstractPAConsumer {
       const mailing_address_parsed = parser.parseLocation(mailing_address);
       // owner occupied
       const owner_occupied = this.compareAddress(property_address_parsed, mailing_address_parsed);
+
+      let property_city = '', property_zip = '', property_state = '';
+      if(owner_occupied){
+        property_city = mailing_city;
+        property_zip = mailing_zip || '';
+        property_state = mailing_state || '';
+      }
         
       // sales info"
       const last_sale_recording_date_xpath = '//font[contains(text(), "Sale Date")]/ancestor::tr/td[2]';
@@ -375,7 +372,7 @@ export default abstract class NewJerseyPAConsumer extends AbstractPAConsumer {
       const total_assessed_value_xpath = '//font[contains(text(), "Owner Information")]/ancestor::tbody/tr[3]/td[5]/font';
       const total_assessed_value = await this.getTextByXpathFromPage(page, total_assessed_value_xpath);
       const est_value = '';
-      const year_built = await this.getTextByXpathFromPage(page, '//td[contains(., "Street:")]/ancestor::tr/td[8]/font');
+      const year_built = await this.getTextByXpathFromPage(page, '//td[contains(., "Year Built:")]/following::*[1]/font');
 
       return {
         owner_names, 
@@ -386,8 +383,8 @@ export default abstract class NewJerseyPAConsumer extends AbstractPAConsumer {
         mailing_zip,
         mailing_state,
         property_city,
-        property_state,
         property_zip,
+        property_state,
         owner_occupied,
         property_type, 
         total_assessed_value, 

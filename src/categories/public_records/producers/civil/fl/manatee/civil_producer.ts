@@ -154,8 +154,9 @@ export default class CivilProducer extends AbstractProducer {
                                 continue;
                             }
                         }
-                        let backToSearchButton = await page.$x('//a[contains(., "Back to Search Results")]');
-                        await backToSearchButton[0].click();
+                        // let backToSearchButton = await page.$x('//a[contains(., "Back to Search Results")]');
+                        // await backToSearchButton[0].click();
+                        await page.goBack();
                     }
                     await page.waitForXPath('//table[@id="results-table"]/tbody/tr/th', { timeout: 60000, visible: true });
                     try {

@@ -1,4 +1,4 @@
-// cron(* 8 * * ? *)
+// cron(50 13 * * ? *)
 require('dotenv').config();
 
 import db from '../models/db';

@@ -16,8 +16,12 @@ const crmSign = require('./routes/sign');
 const crmZillow = require('./routes/zillow');
 
 const dataAppend = require('./routes/append');
+var multipart = require('connect-multiparty');
 
 import Dashboard from './routes/dashboard';
+import Import from './routes/import';
+
+const multipartMiddleware = multipart()
 const dashboard = new Dashboard();
 
 // HEALTH CHECK - do not remove!
@@ -34,6 +38,7 @@ app.get('/health', function (req, res) {
 
   /**Data - Append**/
   app.get('/v1/dashboard/export', dashboard.export);
+  app.post('/v1/dashboard/import', multipartMiddleware, Import);
   app.get('/v1/data/append', dataAppend.waterfall);
 
   /**Notary - Photos and appointments**/

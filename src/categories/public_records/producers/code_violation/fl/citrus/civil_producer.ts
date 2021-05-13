@@ -48,7 +48,7 @@ export default class CivilProducer extends AbstractProducer {
 
         let retry_count = 0;
         while (true) {
-            if (retry_count > 15) {
+            if (retry_count > 3) {
                 return counts;
             }
             try {

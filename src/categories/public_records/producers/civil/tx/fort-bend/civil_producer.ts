@@ -2,7 +2,7 @@ import puppeteer from 'puppeteer';
 import db from '../../../../../../models/db';
 import AbstractProducer from '../../../abstract_producer';
 import { IPublicRecordProducer } from '../../../../../../models/public_record_producer';
-
+import { launchTorBrowser } from '../../../../../../services/general_service';
 
 const removeRowArray = [
     'CITY', 'DEPT', 'CTY', 'UNITED STATES', 'BANK', 'FIA CARD SERVICES NA',
@@ -26,7 +26,7 @@ export default class CivilProducer extends AbstractProducer {
     }
 
     async init(): Promise<boolean> {
-        this.browser = await this.launchBrowser();
+        this.browser = await launchTorBrowser();
         this.browserPages.generalInfoPage = await this.browser.newPage();
         await this.setParamsForPage(this.browserPages.generalInfoPage);
         try {

@@ -36,6 +36,12 @@ export const PRACTICE_TYPES = [
     'personal-injury',
     'marriage',
     'child-support',
+    'criminal',
+    'insurance-claims',
+    'employment-discrimination',
+    'traffic',
+    'property-defect',
+    'declaratory-judgment',
     'other-civil'
 ]
 

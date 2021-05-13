@@ -44,7 +44,7 @@ export default class PAConsumer extends AbstractPAConsumer {
         } catch (err) {
           console.log(err);
           retries++;
-          if (retries > 15) {
+          if (retries > 3) {
               console.log('******** website loading failed');
               return false;
           }
@@ -213,7 +213,7 @@ export default class PAConsumer extends AbstractPAConsumer {
             }
             let retry_count = 0;
             while (true){
-              if (retry_count > 15){
+              if (retry_count > 3){
                   console.error('Connection/website error for 15 iteration.');
                   return false;
               }
@@ -355,7 +355,7 @@ export default class PAConsumer extends AbstractPAConsumer {
       }
 
       // mailing address
-      const mailing_address_xpath = '//th[text()="Mailing Address:"]/parent::tr/td[1]/text()[1]';
+      const mailing_address_xpath = '//th[text()="Mailing Address:"]/parent::tr/td[1]/text()[last()-1]';
       const mailing_address_2_xpath = '//th[text()="Mailing Address:"]/parent::tr/td[1]/text()[last()]';
       let mailing_address = await this.getTextByXpathFromPage(page, mailing_address_xpath);
       let mailing_address_2 = await this.getTextByXpathFromPage(page, mailing_address_2_xpath);

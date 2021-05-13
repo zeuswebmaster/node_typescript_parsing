@@ -13,11 +13,11 @@ export default class PAConsumer extends AbstractPAConsumer {
     ownerProductProperties: IOwnerProductProperty;
 
     urls = {
-        propertyAppraiserPage: 'http://taxinfo.hendersoncountync.gov/'
+        propertyAppraiserPage: 'http://taxinfo.hendersoncountync.gov/CamaPWA/SearchProperty.aspx'
     }
 
     xpaths = {
-        isPAloaded: '//div[@id="hcbanner"]'
+        isPAloaded: '//input[@id="ctl00_ContentPlaceHolder1_OwnerTextBox"]'
     }
 
     constructor(publicRecordProducer: IPublicRecordProducer, ownerProductProperties: IOwnerProductProperty, browser: puppeteer.Browser, page: puppeteer.Page) {
@@ -43,7 +43,7 @@ export default class PAConsumer extends AbstractPAConsumer {
         } catch (err) {
           console.log(err);
           retries++;
-          if (retries > 15) {
+          if (retries > 3) {
               console.log('******** website loading failed');
               return false;
           }
@@ -222,7 +222,7 @@ export default class PAConsumer extends AbstractPAConsumer {
 
             let retry_count = 0;
             while (true){
-              if (retry_count > 15){
+              if (retry_count > 3){
                   console.error('Connection/website error for 15 iteration.');
                   return false;
               }
@@ -231,11 +231,7 @@ export default class PAConsumer extends AbstractPAConsumer {
               } catch (error) {
                 await page.reload();
               }
-              try {            
-                let [tosButton] = await page.$x('//div[@id="button1"]/button');
-                if(tosButton){
-                    await tosButton.click();
-                }
+              try {                
                 await page.waitForSelector('input#ctl00_ContentPlaceHolder1_OwnerTextBox');
                 if (this.searchBy == 'name'){
                     let inputName = await page.$('input#ctl00_ContentPlaceHolder1_OwnerTextBox');

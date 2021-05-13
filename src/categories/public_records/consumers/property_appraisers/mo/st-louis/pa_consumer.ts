@@ -60,7 +60,7 @@ export default class PAConsumer extends AbstractPAConsumer {
           } catch (err) {
             console.log(err);
             retries++;
-            if (retries > 15) {
+            if (retries > 3) {
                 console.log('******** website loading failed');
                 return false;
             }
@@ -303,7 +303,7 @@ export default class PAConsumer extends AbstractPAConsumer {
             let frame_body = page.frames().find(frame => frame.name() === 'body'); // Find the right frame.
             let retry_count = 0;
             while (true) {
-                if (retry_count > 15) {
+                if (retry_count > 3) {
                     console.error('Connection/website error for 15 iteration.');
                     return false;
                 }

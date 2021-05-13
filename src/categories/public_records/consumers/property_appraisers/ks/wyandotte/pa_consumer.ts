@@ -44,7 +44,7 @@ export default class PAConsumer extends AbstractPAConsumer {
           } catch (err) {
             console.log(err);
             retries++;
-            if (retries > 15) {
+            if (retries > 3) {
                 console.log('******** website loading failed');
                 return false;
             }
@@ -277,7 +277,7 @@ export default class PAConsumer extends AbstractPAConsumer {
                 let addr_value = '';
     
                 if (this.searchBy === 'name') {
-                    const nameInfo = this.getNameInfo(document);
+                    const nameInfo = this.getNameInfo(document.ownerId);
                     first_name = nameInfo.first_name;
                     last_name = nameInfo.last_name;
                     owner_name = nameInfo.owner_name;

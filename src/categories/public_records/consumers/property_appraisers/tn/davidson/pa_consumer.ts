@@ -7,6 +7,7 @@ const {parseFullName} = require('parse-full-name');
 
 import { IPublicRecordProducer } from '../../../../../../models/public_record_producer';
 import { IOwnerProductProperty } from '../../../../../../models/owner_product_property';
+import { IProperty } from '../../../../../../models/property';
 
 export default class PAConsumer extends AbstractPAConsumer {
     publicRecordProducer: IPublicRecordProducer;
@@ -17,7 +18,7 @@ export default class PAConsumer extends AbstractPAConsumer {
     }
 
     xpaths = {
-        isPAloaded: '//body"]'
+        isPAloaded: '//body'
     }
 
     constructor(publicRecordProducer: IPublicRecordProducer, ownerProductProperties: IOwnerProductProperty, browser: puppeteer.Browser, page: puppeteer.Page) {
@@ -47,7 +48,7 @@ export default class PAConsumer extends AbstractPAConsumer {
         } catch (err) {
           console.log(err);
           retries++;
-          if (retries > 15) {
+          if (retries > 3) {
               console.log('******** website loading failed');
               return false;
           }
@@ -232,6 +233,29 @@ export default class PAConsumer extends AbstractPAConsumer {
               (address1_street === address2_street);
     }
 
+    getAddress(document: IProperty): any {
+      // 'Property Address': '162 DOUGLAS HILL RD',
+      // 'Property City': 'WEST BALDWIN',
+      // County: 'Cumberland',
+      // 'Property State': 'ME',
+      // 'Property Zip': '04091',
+      const full_address = `${document['Property Address']}, ${document['Property City']}, ${document['Property State']} ${document['Property Zip']}`
+      const parsed = parser.parseLocation(full_address);
+      
+      let street_name = parsed.street.trim();
+      let street_full = document['Property Address'];
+      let street_with_type = (parsed.number ? parsed.number : '') + ' ' + (parsed.prefix ? parsed.prefix : '') + ' ' + parsed.street;
+      street_with_type = street_with_type.trim();
+
+      return {
+        full_address,
+        street_name,
+        street_with_type,
+        street_full,
+        parsed
+      }
+    }
+
     // the main parsing function. if read() succeeds, parseAndSave is started().
     // return true after all parsing is complete 
 
@@ -255,7 +279,11 @@ export default class PAConsumer extends AbstractPAConsumer {
             let owner_name = '';
             let owner_name_regexp = '';
             if(this.searchBy == 'address'){
-                address = this.getAddressV2(document.propertyId);
+                address = this.getAddress(document.propertyId);
+                const parsedaddr = this.getAddressV2(document.propertyId);
+                if(!this.isEmptyOrSpaces(parsedaddr.street_address)){
+                  address['parsed'] = parser.parseLocation(parsedaddr.street_address);
+                }
                 console.log("Looking for address:", document.propertyId['Property Address'])
             } else {
                 let nameInfo = this.getNameInfo(document.ownerId, ',');
@@ -266,7 +294,7 @@ export default class PAConsumer extends AbstractPAConsumer {
 
             let retry_count = 0;
             while (true){
-              if (retry_count > 15){
+              if (retry_count > 3){
                   console.error('Connection/website error for 15 iteration.');
                   return false;
               }

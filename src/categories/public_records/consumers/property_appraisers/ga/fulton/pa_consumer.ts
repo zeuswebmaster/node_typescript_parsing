@@ -5,6 +5,7 @@ var parser = require('parse-address');
 import { IPublicRecordProducer } from '../../../../../../models/public_record_producer';
 import { IOwnerProductProperty } from '../../../../../../models/owner_product_property';
 import { IProperty } from '../../../../../../models/property';
+import { launchTorBrowser, setParamsForPage } from '../../../../../../services/general_service';
 
 export default class PAConsumer extends AbstractPAConsumer {
     publicRecordProducer: IPublicRecordProducer;
@@ -163,12 +164,24 @@ export default class PAConsumer extends AbstractPAConsumer {
     // so use an xpath that is available when page is usable.
     // return true when it's usable, false if it errors out.
     async read(): Promise<boolean> {
-        try {
-            await this.browserPages.propertyAppraiserPage?.waitForXPath(this.xpaths.isPAloaded);
-            return true;
-        } catch (err) {
-            console.warn('Problem loading property appraiser page.');
-            return false;
+        let retries = 0;
+        while(true){
+            if(retries > 15){
+                return false;
+            }
+            try {
+                await this.browserPages.propertyAppraiserPage?.waitForXPath(this.xpaths.isPAloaded);
+                return true;
+            } catch (err) {
+                console.log(await this.browserPages.propertyAppraiserPage?.content())
+                console.warn('Problem loading property appraiser page.');
+                this.browser = await launchTorBrowser();
+                let newPage = await this.browser.newPage();
+                this.browserPages.propertyAppraiserPage = newPage;
+                await setParamsForPage(this.browserPages.propertyAppraiserPage);
+                await this.browserPages.propertyAppraiserPage.goto(this.urls.propertyAppraiserPage, { waitUntil: 'load' });
+            }
+            retries++;
         }
     }
 
@@ -353,7 +366,7 @@ export default class PAConsumer extends AbstractPAConsumer {
 
             if (this.searchBy === 'name') {
                 url = 'https://iaspublicaccess.fultoncountyga.gov/search/commonsearch.aspx?mode=owner';
-                const nameInfo = this.getNameInfo(doc);
+                const nameInfo = this.getNameInfo(doc.ownerId);
                 first_name = nameInfo.first_name;
                 last_name = nameInfo.last_name;
                 owner_name = nameInfo.owner_name;

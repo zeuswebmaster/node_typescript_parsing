@@ -3,7 +3,7 @@ import db from '../models/db';
 import puppeteer from 'puppeteer';
 var addressit = require('addressit');
 import { IOwnerProductProperty } from '../models/owner_product_property';
-import { normalizeDate, hasLastSaleRecordDate, isEmptyOrSpaces, sleep, setParamsForPage, getTextByXpathFromPage } from '../services/general_service';
+import { normalizeDate, hasLastSaleRecordDate, isEmptyOrSpaces, sleep, setParamsForPage, getTextByXpathFromPage, hasZipCode } from '../services/general_service';
 
 const totalviewConsumer = async (ownerProductProperty: IOwnerProductProperty, totalview_page: puppeteer.Page) => {
 
@@ -11,7 +11,11 @@ const totalviewConsumer = async (ownerProductProperty: IOwnerProductProperty, to
         const parsed = addressit(full_address);
         let street_address = (parsed.number ? parsed.number : '') + ' ' + (parsed.street ? parsed.street : '') + ' ' + (parsed.unit ? '#'+parsed.unit : '');
         street_address = street_address.replace(/\s+/, ' ').trim();
-        return street_address;
+        let zip = parsed.postalcode || '';
+        return {
+            street_address,
+            zip
+        };
     }
 
     console.log('STARTED - TOTALVIEWREALESTATE!!!');
@@ -23,8 +27,8 @@ const totalviewConsumer = async (ownerProductProperty: IOwnerProductProperty, to
 
     let street_address = ownerProductProperty.propertyId['Property Address'];
     const parse_full = getStreetAddress(`${ownerProductProperty.propertyId['Property Address']}, ${ownerProductProperty.propertyId['Property City'] || ''} ${ownerProductProperty.propertyId['Property State'] || ''} ${ownerProductProperty.propertyId['Property Zip'] || ''}`);
-    if(!isEmptyOrSpaces(parse_full)){
-        street_address = parse_full;
+    if(!isEmptyOrSpaces(parse_full.street_address)){
+        street_address = parse_full.street_address;
     }
     let city = ownerProductProperty.propertyId['Property City'] || '';
     let state = ownerProductProperty.propertyId['Property State'] || '';
@@ -53,8 +57,8 @@ const totalviewConsumer = async (ownerProductProperty: IOwnerProductProperty, to
         await totalview_page.waitForXPath('//*[@id="propinfo"]/span[1]', {timeout: 60000});
         let result_address: any = await getTextByXpathFromPage(totalview_page, '//*[@id="propinfo"]/span[1]');
         const parseresult = getStreetAddress(result_address);
-        if(!isEmptyOrSpaces(parseresult)){
-            result_address = parseresult;
+        if(!isEmptyOrSpaces(parseresult.street_address)){
+            result_address = parseresult.street_address;
         }
         result_address = result_address.replace(/\s+|\W/g, '').trim().toUpperCase();
         street_address = street_address.replace(/\s+|\W/g, '').trim().toUpperCase();
@@ -74,8 +78,8 @@ const totalviewConsumer = async (ownerProductProperty: IOwnerProductProperty, to
         
         let validDate = date !== '' && price !== '' && hasLastSaleRecordDate(date);
         let validYearBuilt = !!(year_built && year_built.match(/\d/));
-        if (!validDate && !validYearBuilt) {
-            throw 'ERROR - NO SOLD DATA or NO YEAR BUILT';
+        if (!validDate && !validYearBuilt && !hasZipCode(parseresult.zip)) {
+            throw 'ERROR - NO SOLD DATA or NO YEAR BUILT or PROPERTY ZIP';
         }
         console.log('++++++++++ FOUND ++++++++++')
         console.log(`DATE: ${date} AMOUNT: ${price} YEAR BUILT: ${year_built}`);
@@ -89,6 +93,7 @@ const totalviewConsumer = async (ownerProductProperty: IOwnerProductProperty, to
             if (validYearBuilt) {
                 property['yearBuilt'] = year_built;
             }
+            property['Property Zip'] = parseresult.zip;
             let bedrooms = parseInt(await getTextByXpathFromPage(totalview_page, '//td[normalize-space(text())="Beds:"]/following-sibling::td[1]'));
             let bathrooms = parseInt(await getTextByXpathFromPage(totalview_page, '//td[normalize-space(text())="Baths:"]/following-sibling::td[1]'));
             let sqft = parseInt(await getTextByXpathFromPage(totalview_page, '//td[normalize-space(text())="SqFt:"]/following-sibling::td[1]'));

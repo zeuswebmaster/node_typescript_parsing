@@ -115,7 +115,7 @@ export default class CivilProducer extends AbstractProducer {
                 } catch {
                     retries++;
                     console.log(`retrying...${retries}`);
-                    if (retries > 15) return false;
+                    if (retries > 3) return false;
                     await page.waitFor(1000);
                     continue;
                 }

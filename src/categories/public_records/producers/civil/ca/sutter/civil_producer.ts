@@ -107,7 +107,7 @@ export default class CivilProducer extends AbstractProducer {
                 await nextGridPageEl[0].click();
             } catch (e) {
                 retries++;
-                if (retries > 15) {
+                if (retries > 3) {
                     console.error(e);
                     break;
                 }

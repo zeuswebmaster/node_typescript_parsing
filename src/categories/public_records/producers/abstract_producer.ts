@@ -11,7 +11,7 @@ const config: IConfigEnv = CONFIG[process.env.NODE_ENV || 'production'];
 import SnsService from '../../../services/sns_service';
 import S3Service from '../../../services/s3_service';
 const parseFullName = require('parse-full-name').parseFullName;
-import { saveToOwnerProductPropertyByProducer, getPracticeType, launchBrowser, clearPage, setParamsForPage } from '../../../services/general_service';
+import { saveToOwnerProductPropertyByProducer, getPracticeType, launchBrowser, launchTorBrowser, clearPage, setParamsForPage } from '../../../services/general_service';
 import { PRACTICE_TYPES } from '../../../scripts/db/public_record_seed_generator';
 
 export default abstract class AbstractProducer {
@@ -24,6 +24,7 @@ export default abstract class AbstractProducer {
     whitepages_page: puppeteer.Page | undefined;
     totalview_browser: puppeteer.Browser | undefined;
     totalview_page: puppeteer.Page | undefined;
+    is_tor: boolean | undefined;
 
     browserPages = {
         generalInfoPage: undefined as undefined | puppeteer.Page
@@ -92,20 +93,22 @@ export default abstract class AbstractProducer {
     // Send Notification
     ///////////////////////////////////////////////////////////////////////
     static async sendMessage(county: string, state: string, countRecords: number, sourceType: string, imageUrl: string='', noScript:boolean=false) {
-        const snsService = new SnsService();
-        let topicName = SnsService.CIVIL_TOPIC_NAME;
-        if (! await snsService.exists(topicName)) {
-            await snsService.create(topicName);
-        }
+        // const snsService = new SnsService();
+        // let topicName = SnsService.CIVIL_TOPIC_NAME;
+        // if (! await snsService.exists(topicName)) {
+        //     await snsService.create(topicName);
+        // }
 
-        if (! await snsService.subscribersReady(topicName, SnsService.CIVIL_UPDATE_SUBSCRIBERS)) {
-            await snsService.subscribeList(topicName);
-        }
+        // if (! await snsService.subscribersReady(topicName, SnsService.CIVIL_UPDATE_SUBSCRIBERS)) {
+        //     await snsService.subscribeList(topicName);
+        // }
         if (noScript) {
-            await snsService.publish(topicName, `NO SCRIPT ${county} county, ${state} for ${sourceType}`);
+            console.log(`NO SCRIPT ${county} county, ${state} for ${sourceType}`);
+        //     await snsService.publish(topicName, `NO SCRIPT ${county} county, ${state} for ${sourceType}`);
         } else {
-            const optional_data = imageUrl ? `Image Url: ${imageUrl}` : ''
-            await snsService.publish(topicName, `${county} county, ${state} total ${sourceType} data saved: ${countRecords}\n${optional_data}`);
+            console.log(`${county} county, ${state} total ${sourceType} data saved: ${countRecords}`);
+        //     const optional_data = imageUrl ? `Image Url: ${imageUrl}` : ''
+        //     await snsService.publish(topicName, `${county} county, ${state} total ${sourceType} data saved: ${countRecords}\n${optional_data}`);
         }
     }
 
@@ -116,6 +119,7 @@ export default abstract class AbstractProducer {
 
     async startParsing(finishScript?: Function) {
         try {
+            this.is_tor = false;
             this.county_browser = await launchBrowser();
             this.county_page = await this.county_browser.newPage();
             await clearPage(this.county_page);
@@ -181,6 +185,10 @@ export default abstract class AbstractProducer {
         return await launchBrowser();
     }
 
+    async launchTorBrowser(): Promise<puppeteer.Browser> {
+        return await launchTorBrowser();
+    }
+
     async setParamsForPage(page: puppeteer.Page): Promise<void> {
         await setParamsForPage(page);
     }
@@ -199,7 +207,7 @@ export default abstract class AbstractProducer {
         day = day.toString().padStart(2, '0');
         return month + '/' + day + '/' + year;
     }
-    protected async getDateRange(state: string, county: string) {
+    protected async getDateRange(state: string, county: string, dateRange = 30) {
         console.log('\n// =============== FETCHING DATE RANGE ===============')
         let normalizedState = this.normalizeStringForMongo(state);
         if(normalizedState.length > 2){
@@ -256,7 +264,7 @@ export default abstract class AbstractProducer {
         // }, null, { sort: { fillingDate: -1 } }); // check last item from DB
 
         let fromDate;
-        const DATERANGE = process.env.NODE_ENV === 'test' ? 60 : 60;
+        const DATERANGE = dateRange;
         if (lastfillingDate) {
             fromDate = new Date(lastfillingDate);
             if (isNaN(fromDate.getTime())) {
@@ -321,7 +329,7 @@ export default abstract class AbstractProducer {
     })
 
     protected getFileFromS3Bucket = async (identifierString: string) => {
-        const s3bucket = 'scraper-json-data';
+        const s3bucket = 'scraper-json-data2';
         const s3key = `producer-dependencies/${identifierString}`;
 
         const params = {
@@ -346,7 +354,7 @@ export default abstract class AbstractProducer {
     }
 
     protected writeFileToS3Bucket = async (identifierString: string, stringifiedBody: string) => {
-        const s3bucket = 'scraper-json-data';
+        const s3bucket = 'scraper-json-data2';
         const s3key = `producer-dependencies/${identifierString}`;
 
         const params = {
@@ -403,11 +411,12 @@ export default abstract class AbstractProducer {
         'LENDING', 'FCU', 'TOWNSHIP', 'SPECTRUM', 'CU', 'GATEWAY',
         'LOANS', 'MERS', 'SPECTRUM', 'CU', 'BK', 'UN', 'PA', 'DOLLAR', 'ASSN', 'MTG', 'REVOLUTION', 'NATL',
         'BUSINESS', 'CREDIT', 'COMMUNITY', 'HEALTH', 'ELECTRONIC', 'REGISTRATION', 'INSTRUMENT', 'EDUCATIONAL', 'BUILDERS', 'TAX ASSESSORS', 'APARTMENTS', 'ESTATES',
-        'FINANCE', 'CAPITAL', 'SYSTEMS','SUBDIVISION', 'UNKNOWN', 'GROUP', 'CUSTOMER', 'AVENUE', 'CONFERENCE', 'SQUARE', 'VILLAGE', 'SHOPS', 'FINANCIAL', 'MEDICAL', 'INDUSTRIAL', 'HOSPITAL'
+        'FINANCE', 'CAPITAL', 'SYSTEMS','SUBDIVISION', 'UNKNOWN', 'GROUP', 'CUSTOMER', 'AVENUE', 'CONFERENCE', 'SQUARE', 'VILLAGE', 'SHOPS', 'FINANCIAL', 'MEDICAL', 'INDUSTRIAL', 'HOSPITAL',
+        'CITIBANK', 'TOWN OF'
     ];
 
     suffixNamesArray = ['I', 'II', 'III', 'IV', 'V', 'ESQ', 'JR', 'SR'];
-    removeFromNamesArray = ['ET', 'AS', 'DECEASED', 'DCSD', 'CP\/RS', 'JT\/RS', 'TR', 'TRUSTEE', 'TRUST'];
+    removeFromNamesArray = ['ET', 'AS', 'DECEASED', 'DCSD', 'CP\/RS', 'JT\/RS', 'TR', 'TRUSTEE', 'TRUST', 'ETAL', 'REVOCABLE LIVING'];
 
     // main method that will used in any producer.
     protected newParseName(name: string){
@@ -631,6 +640,19 @@ export default abstract class AbstractProducer {
     //   "productId": prod._id
     // }
     async civilAndLienSaveToNewSchema(data: any){
+        // Using Tor Browser
+        if( (this.normalizeStringForMongo(data['County']) == 'pima' && data['Property State'] == 'AZ') || data['Property State'] == 'AR' || (this.normalizeStringForMongo(data['County']) == 'prince-william' && data['Property State'] == 'VA') || (this.normalizeStringForMongo(data['County']) == 'st-joseph' && data['Property State'] == 'IN') || (this.normalizeStringForMongo(data['County']) == 'sedgwick' && data['Property State'] == 'KS')){
+            if(!this.is_tor){
+                await this.county_page?.close();
+                await this.county_browser?.close();
+                this.county_browser = await this.launchTorBrowser();
+                this.county_page = await this.county_browser.newPage();
+                await clearPage(this.county_page);
+                await setParamsForPage(this.county_page);
+                this.is_tor = true;
+            }
+        }
+        
         return await saveToOwnerProductPropertyByProducer(data, this.publicRecordProducer, this.county_page, this.whitepages_page, this.realtor_page, this.totalview_page);
     }
 

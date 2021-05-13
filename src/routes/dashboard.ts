@@ -5,7 +5,7 @@ const uuid = require('uuid').v4
 import path from 'path'
 import { verifyToken } from '../services/jwt_service';
 import db from '../models/db';
-import { appendFile, appendFileSync, existsSync, unlinkSync, createWriteStream, mkdirSync } from 'fs';
+import { existsSync, unlinkSync, createWriteStream, mkdirSync, WriteStream } from 'fs';
 import mongoose from 'mongoose';
 import { normalizeDate } from '../services/general_service';
 import AddressService from '../services/address_service';
@@ -43,6 +43,8 @@ export default class Dashboard {
                 const selState = req.query.state;
                 const selCounty = req.query.county;
                 const selZip = req.query.zip;
+                const productIdsCount = req.query.owners;
+
                 let filterProperty: any = {}
                 for (let i = 0; i < filters.length; i++) {
                     filterProperty[filters[i][0]] = {$regex: filters[i][1]}
@@ -54,6 +56,7 @@ export default class Dashboard {
                 console.log('state: ', selState);
                 console.log('county: ', selCounty);
                 console.log('zip: ', selZip);
+                console.log('productIds count:', productIdsCount);
 
                 let dateFrom = new Date(new Date(from).setHours(0, 0, 0));
                 let dateTo = new Date(new Date(to).setHours(23, 59, 59));
@@ -69,11 +72,42 @@ export default class Dashboard {
                     propertyId: {$ne: null}
                 };
 
-                if (practiceType !== 'all' || selState !== 'all' || selCounty !== 'all') {
-                    let regexpProduct = `/${selState==='all'?'.*':selState}/${selCounty==='all'?'.*':selCounty}/${practiceType==='all'?'.*':practiceType}$`;
-                    let productIds = await db.models.Product.find({name: {$regex: new RegExp(regexpProduct, 'i')}}).exec();
-                    condition = {...condition, productId: {$in: productIds.map(prodId => mongoose.Types.ObjectId(prodId.id))}};
+                // if (practiceType !== 'all' || selState !== 'all' || selCounty !== 'all') {
+                //     let regexpProduct = `/${selState==='all'?'.*':selState}/${selCounty==='all'?'.*':selCounty}/${practiceType==='all'?'.*':practiceType}$`;
+                //     let productIds = await db.models.Product.find({name: {$regex: new RegExp(regexpProduct, 'i')}}).exec();
+                //     condition = {...condition, productId: {$in: productIds.map(prodId => mongoose.Types.ObjectId(prodId.id))}};
+                // }
+
+                if (practiceType.split(',').length < 30 || selState !== 'all' || selCounty !== 'all') {
+                    let productIdsArr = [];
+                    for(const practice of practiceType.split(',')){
+                        let regexpProduct = `/${selState==='all'?'.*':selState}/${selCounty==='all'?'.*':selCounty}/${practice}$`;
+                        console.log(regexpProduct);
+                        const productIds = await db.models.Product.find({name: {$regex: new RegExp(regexpProduct, 'i')}}).exec();
+                        for(const productId of productIds){
+                            productIdsArr.push(productId._id);
+                        }
+                    }
+                    condition = {...condition, productId: { $in: productIdsArr }};
                 }
+
+                // aggregateConditions = [
+                //     {$lookup: {from: 'properties', localField: 'propertyId', foreignField: '_id', as: 'property'}},
+                //     {$unwind: "$property"},
+                //     {$lookup: {from: 'owners', localField: 'ownerId', foreignField: '_id', as: 'owner'}},
+                //     {$unwind: "$owner"},
+                //     {$lookup: {from: 'products', localField: 'productId', foreignField: '_id', as: 'product'}},
+                //     {$unwind: "$product"},
+                //     {
+                //         $match: {
+                //             'property.Last Sale Recording Date': {
+                //                 $exists: true,
+                //                 $nin: [
+                //                     null, undefined, '', 'n/a', 'N/A', 'undefined', 'null'
+                //                 ]
+                //             }, ...filterProperty
+                //         }
+                //     }];
 
                 aggregateConditions = [
                     {$lookup: {from: 'properties', localField: 'propertyId', foreignField: '_id', as: 'property'}},
@@ -82,16 +116,7 @@ export default class Dashboard {
                     {$unwind: "$owner"},
                     {$lookup: {from: 'products', localField: 'productId', foreignField: '_id', as: 'product'}},
                     {$unwind: "$product"},
-                    {
-                        $match: {
-                            'property.Last Sale Recording Date': {
-                                $exists: true,
-                                $nin: [
-                                    null, undefined, '', 'n/a', 'N/A', 'undefined', 'null'
-                                ]
-                            }, ...filterProperty
-                        }
-                    }];
+                    ];
 
                 if (selZip && selZip !== 'null') {
                   aggregateConditions.push(
@@ -106,7 +131,46 @@ export default class Dashboard {
                     }
                   )
                 }
-                const outputFiles: string[] = [];
+
+                if(productIdsCount && productIdsCount != '' && productIdsCount != 'all'){
+                    aggregateConditions.push(
+                        {
+                            $group: {
+                                _id: { ownerId: "$ownerId" },
+                                uniqueIds: { $addToSet: "$_id" },
+                                count: { $sum: 1 } 
+                                } }, 
+                            { $match: { 
+                                count: { $eq: parseInt(productIdsCount) } 
+                            }
+                        }
+                    )
+                    let docs: any[] = await db.models.OwnerProductProperty.aggregate([
+                        { $match: condition },
+                        ...aggregateConditions
+                        ])
+
+                    let uniqueIds = [];
+                    for(const doc of docs){
+                        for(const uniqueId of doc.uniqueIds){
+                            uniqueIds.push(uniqueId);
+                        }
+                    }
+
+                    aggregateConditions = [
+                        {$lookup: {from: 'properties', localField: 'propertyId', foreignField: '_id', as: 'property'}},
+                        {$unwind: "$property"},
+                        {$lookup: {from: 'owners', localField: 'ownerId', foreignField: '_id', as: 'owner'}},
+                        {$unwind: "$owner"},
+                        {$lookup: {from: 'products', localField: 'productId', foreignField: '_id', as: 'product'}},
+                        {$unwind: "$product"},
+                    ];
+                    condition = {
+                        _id: { $in: uniqueIds }
+                    };
+                }
+
+                // const outputFiles: any[] = [];
                 const filename = 'export'; //TODO better filename
                 if (existsSync(folderName)) {
                     rimraf.sync(folderName);
@@ -114,7 +178,7 @@ export default class Dashboard {
                 mkdirSync(folderName);
 
                 const totalDocs = await db.models.OwnerProductProperty.countDocuments(condition).exec();
-                const docsPerThread = Math.floor(totalDocs / THREADS);
+                let docsPerThread = Math.floor(totalDocs / THREADS);
 
                 console.log(totalDocs + ' documents, ' + docsPerThread + ' docs per thread');
 
@@ -131,7 +195,7 @@ export default class Dashboard {
 
                     if (finishedThreads.every((val) => val === true)) {
                         console.log('File created in ' + Math.round((new Date().getTime() - debugTime) / 1000) + ' seconds');
-                        sendFileResponse(res, outputFiles, folderName);
+                        sendFileResponse(res, folderName);
                     }
                 };
 
@@ -143,7 +207,6 @@ export default class Dashboard {
                         {$match: condition},
                         {$skip: i * docsPerThread},
                         ...aggregateConditions]).limit(1);
-
                     console.log(JSON.stringify(docs));
                     console.log(JSON.stringify([
                         {$match: condition},
@@ -152,19 +215,24 @@ export default class Dashboard {
 
                     // create file for thread and add first retrieve documents
                     const threadFilename = path.join(folderName, `${filename}_${i}.csv`);
-                    outputFiles.push(threadFilename);
-                    if (existsSync(threadFilename)) {
-                        unlinkSync(threadFilename);
-                    }
+                    const fileStream = createWriteStream(threadFilename, { flags: 'a' });
+
+                    // if (existsSync(threadFilename)) {
+                    //     unlinkSync(threadFilename);
+                    // }
+                    // outputFiles.push(fileStream);
                     if (docs[0]) {
-                      appendFile(threadFilename, objectToCSV(transformer(docs[0]), true), () => {});
+                      fileStream.write(objectToCSV(transformer(docs[0]), true))
+                      // appendFile(threadFilename, objectToCSV(transformer(docs[0]), true), (err) => {
+                      //   console.log(`Thread #${i} appendFile failed ${err}`)
+                      // });
                     }
 
                     let docsToQuery = docsPerThread - 1;
                     if (i === THREADS - 1) {
                         docsToQuery += totalDocs - (docsPerThread * THREADS); // the last thread takes all the remaining docs
                     }
-                    queryDocs(i, docs[0]?._id, threadFilename, docsToQuery, finishedCallback);
+                    queryDocs(i, docs[0]?._id, fileStream, docsToQuery, finishedCallback);
                 }
             }
         } catch(err) {
@@ -177,7 +245,7 @@ export default class Dashboard {
 
 const queryDocs = async (threadNum: number,
                          startDocId: any,
-                         filename: string,
+                         fileStream: WriteStream,
                          remainingDocs: number,
                          callback: Function) => {
 
@@ -194,14 +262,20 @@ const queryDocs = async (threadNum: number,
         console.log('#' + threadNum + ': Got ' + documents.length + ' docs, ' + remainingDocs + ' remaining');
 
         for (const doc of documents) {
-            appendFile(filename, objectToCSV(transformer(doc)), () => {});
+            fileStream.write(objectToCSV(transformer(doc)))
+            // appendFile(fileStream, objectToCSV(transformer(doc)), () => {});
         }
 
         if (documents.length > 0 && remainingDocs - documents.length > 0) {
             const lastDocId = documents[documents.length - 1]._id;
-            queryDocs(threadNum, lastDocId, filename, remainingDocs - documents.length, callback);
+            queryDocs(threadNum, lastDocId, fileStream, remainingDocs - documents.length, callback);
         } else {
-            callback(threadNum);
+            console.log(`Thread ${threadNum} finished, end stream.`);
+            fileStream.end()
+            fileStream.on("finish", () => {
+              console.log(`Thread ${threadNum} stream finish event`);
+              callback(threadNum);
+            });
         }
     } catch (err) {
         console.trace(err);
@@ -210,7 +284,7 @@ const queryDocs = async (threadNum: number,
 };
 
 
-const sendFileResponse = (res: any, files: string[], folderName: string) => {
+const sendFileResponse = (res: any, folderName: string) => {
     const archiveName = `${uuid()}_${ARCHIVE_NAME}`;
     if (existsSync(archiveName)) {
         unlinkSync(archiveName);
@@ -232,6 +306,8 @@ const sendFileResponse = (res: any, files: string[], folderName: string) => {
     });
 
     archive.on('error', (err: any) => {
+        console.log('Archive error ', err)
+        rimraf.sync(folderName);
         res.status(500).send(err);
     });
 
@@ -271,6 +347,14 @@ const transformer = (doc: any)=> {
             if (!mailing_zip) mailing_zip = parsed_address.zip;
         }
     }
+
+    if(property_zip == '' && mailing_zip != ''){
+        if(AddressService.compareFullAddress(property_address, mailing_address) && (property_state == mailing_state)){
+            property_zip = mailing_zip;
+            if(property_city == '') property_city = mailing_city;
+        }
+    }
+
     const practiceTypes: any = {
         'foreclosure': 'Foreclosure',
         'preforeclosure': 'Preforeclosure',
@@ -294,6 +378,12 @@ const transformer = (doc: any)=> {
         'personal-injury': 'Personal Injury',
         'marriage': 'Marriage',
         'child-support': 'Child Support',
+        'criminal': 'Criminal',
+        'insurance-claims': 'Insurance Claims',
+        'employment-discrimination': 'Employment Discrimination',
+        'traffic': 'Traffic',
+        'property-defect': 'Property Defect',
+        'declaratory-judgment': 'Declaratory Judgment',
         'other-civil': 'Other Civil',
     };
     let record: any = {};
@@ -307,7 +397,7 @@ const transformer = (doc: any)=> {
     record['Last Name'] = doc['owner']?.['Last Name'];
     record['Middle Name'] = doc['owner']?.['Middle Name'];
     record['Name Suffix'] = doc['owner']?.['Name Suffix'];
-    record['Phone'] = doc['owner']?.['Phone'];
+    // record['Phone'] = doc['owner']?.['Phone'];
     record['Mailing Address'] = mailing_address;
     record['Mailing Unit #'] = doc['owner']?.['Mailing Unit #'];
     record['Mailing City'] = mailing_city;
@@ -323,7 +413,7 @@ const transformer = (doc: any)=> {
     record['Property Type'] = doc['property']?.['Property Type'];
     record['Total Assessed Value'] = doc['property']?.['Total Assessed Value'];
     record['Last Sale Recording Date'] = last_sale_recording_date;
-    record['Last Sale Recording Date Formatted'] = doc['property']?.['Last Sale Recording Date Formatted'];
+    // record['Last Sale Recording Date Formatted'] = doc['property']?.['Last Sale Recording Date Formatted'];
     record['Last Sale Amount'] = doc['property']?.['Last Sale Amount'];
     record['Est Value'] = doc['property']?.['Est Value'];
     record['Est Equity'] = doc['property']?.['Est Equity'];
@@ -346,6 +436,7 @@ const transformer = (doc: any)=> {
     record['Lien Amount'] = doc['property']['Lien Amount'];
     record['Est. Remaining balance of Open Loans'] = doc['property']['Est. Remaining balance of Open Loans'];
     record['Tax Lien Year'] = doc['property']['Tax Lien Year'];
+    record['propertyFrom'] = doc['property']['propertyFrom'];
     return record;
     // return {
     //     'Full Name': doc['owner']?.['Full Name'],
@@ -386,7 +477,19 @@ const objectToCSV = (obj: any, header: boolean = false) => {
             result += columnDelimiter;
         }
 
-        result += typeof obj[key] === "string" && obj[key].includes(columnDelimiter) ? `"${obj[key]}"` : obj[key];
+
+        let field = obj[key]
+        if (typeof obj[key] === "string") {
+          field = field.replace(/'/g, "\'")
+          field = field.replace(/"/g, "\"")
+          field = field.replace(/[\n\r]/g, '')
+          field = field.replace(/\s\s+/g, ' ').trim()
+          if (field && field.includes(columnDelimiter)) {
+            field = `"${field}"`
+          }
+        }
+
+        result += field
         ctr++
     });
 

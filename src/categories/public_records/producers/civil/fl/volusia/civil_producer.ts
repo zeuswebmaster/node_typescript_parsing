@@ -147,7 +147,7 @@ export default class CivilProducer extends AbstractProducer {
     async waitForSuccess(func: Function): Promise<boolean> {
         let retry_count = 0;
         while (true){
-            if (retry_count > 15){
+            if (retry_count > 3){
                 console.error('Connection/website error for 15 iteration.');
                 return false;
             }

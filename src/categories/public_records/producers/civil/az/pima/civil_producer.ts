@@ -42,7 +42,7 @@ export default class CivilProducer extends AbstractProducer {
               break;
             } catch (err) {
                 retries++;
-                if (retries > 15) {
+                if (retries > 3) {
                     console.log('******** website loading failed');
                     return false;
                 }
@@ -111,7 +111,7 @@ export default class CivilProducer extends AbstractProducer {
                     break;
                     } catch (err) {
                         retries++;
-                        if (retries > 15) {
+                        if (retries > 3) {
                             console.log('******** website loading failed');
                             return false;
                         }

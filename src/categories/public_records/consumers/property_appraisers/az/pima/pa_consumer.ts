@@ -23,7 +23,7 @@ export default class PAConsumer extends AbstractPAConsumer {
     }
 
     xpaths = {
-        isPAloaded: '//*[contains(@id, "searchPills"]/ul/li[@heading="Address"]'
+        isPAloaded: '//*[contains(@id, "searchPills")]/ul/li[@heading="Address"]'
     }
 
     constructor(publicRecordProducer: IPublicRecordProducer, ownerProductProperties: IOwnerProductProperty, browser: puppeteer.Browser, page: puppeteer.Page) {
@@ -335,7 +335,7 @@ export default class PAConsumer extends AbstractPAConsumer {
                       break;
                   } catch (err) {
                       retries++;
-                      if (retries > 15) {
+                      if (retries > 3) {
                           console.log('******** website loading failed');
                           return false;
                       }
@@ -537,7 +537,8 @@ export default class PAConsumer extends AbstractPAConsumer {
       }
 
       // property address
-      const prop_addr_cols = await page.$x('//*[text()="Property Address"]/ancestor::table[1]/tbody/tr/td');
+      const prop_addr_cols = await page.$x('//*[text()="Property Address"]/ancestor::table[1]/tbody/tr[1]/td');
+      prop_addr_cols.pop();
       let property_address = '';
       for (const col of prop_addr_cols) {
         property_address += (await page.evaluate(el => el.textContent.trim(), col)) + ' ';

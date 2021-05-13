@@ -38,7 +38,7 @@ export default class PAConsumer extends AbstractPAConsumer {
         } catch (err) {
           console.log(err);
           retries++;
-          if (retries > 15) {
+          if (retries > 3) {
               console.log('******** website loading failed');
               return false;
           }
@@ -149,7 +149,7 @@ export default class PAConsumer extends AbstractPAConsumer {
             let address_street = '';
 
             if (this.searchBy === 'name') {
-              const nameInfo = this.getNameInfo(document.ownerId, ",");
+              const nameInfo = this.getNameInfo(document.ownerId);
               first_name = nameInfo.first_name;
               last_name = nameInfo.last_name;
               owner_name = nameInfo.owner_name;
@@ -173,7 +173,7 @@ export default class PAConsumer extends AbstractPAConsumer {
 
             let retry_count = 0;
             while (true){
-              if (retry_count > 15){
+              if (retry_count > 3){
                   console.error('Connection/website error for 15 iteration.');
                   return false;
               }
@@ -211,7 +211,7 @@ export default class PAConsumer extends AbstractPAConsumer {
                   buttonSearch.click(),
                   page.waitForNavigation()
                 ]);
-                await page.waitForXPath('//*[@id="searchResults"]');
+                // await page.waitForXPath('//*[@id="searchResults"]');
                 const [hasResult] = await page.$x('//*[@id="searchResults"]/tbody/tr[position()>2]');
                 if (!hasResult) {
                   console.log('*** No Results Found!');

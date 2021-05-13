@@ -55,6 +55,7 @@ export interface IProperty extends Document {
     'Est. Remaining balance of Open Loans': string;
     'Tax Lien Year': string;
     'caseUniqueId': string;
+    'propertyFrom': string;
     fillingDate: string;
     vacancyProcessed: boolean;
 }
@@ -137,6 +138,7 @@ const schema = new mongoose.Schema(
         'Est. Remaining balance of Open Loans': String,
         'Tax Lien Year': String,
         'caseUniqueId': String,
+        'propertyFrom': String,
         fillingDate: String,
         vacancyProcessed: Boolean,
     },

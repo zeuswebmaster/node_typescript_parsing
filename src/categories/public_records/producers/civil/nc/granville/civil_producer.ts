@@ -75,7 +75,7 @@ export default class CivilProducer extends AbstractProducer {
             // search with date range
             let retry_count = 1;
             while (true) {
-                if (retry_count > 15) {
+                if (retry_count > 3) {
                     console.log('');
                     await AbstractProducer.sendMessage('Granville', 'North Carolina', countRecords, 'Civil & Lien');
                     return false;

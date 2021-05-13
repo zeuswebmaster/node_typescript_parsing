@@ -233,7 +233,7 @@ export default class PAConsumer extends AbstractPAConsumer {
             let owner_name_regexp = '';
 
             if (this.searchBy === 'name') {
-              const nameInfo = this.getNameInfo(document);
+              const nameInfo = this.getNameInfo(document.ownerId);
               first_name = nameInfo.first_name;
               last_name = nameInfo.last_name;
               owner_name = nameInfo.owner_name;
